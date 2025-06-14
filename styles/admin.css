@@ -1,0 +1,11 @@
+.admin-dropdown {
+  z-index: 9995;
+}
+
+.admin-submenu {
+  z-index: 9996;
+}
+
+.admin-modal {
+  z-index: 9999;
+}
