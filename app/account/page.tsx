@@ -1,6 +1,4 @@
-"use client";
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { createBrowserClient } from '@supabase/ssr';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
@@ -11,7 +9,8 @@ import WishlistTab from "@/components/account/WishlistTab";
 import NotificationsTab from "@/components/account/NotificationsTab";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function AccountPage() {
+function AccountContent() {
+  "use client";
   const [activeTab, setActiveTab] = useState("profile");
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
@@ -124,5 +123,13 @@ export default function AccountPage() {
         </Tabs>
       </div>
     </div>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AccountContent />
+    </Suspense>
   );
 }
