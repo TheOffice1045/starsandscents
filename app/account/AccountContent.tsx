@@ -42,7 +42,7 @@ export default function AccountContent() {
       
       setUser(user);
       
-      // Get profile data from customers table
+      // Get profile data from the customers table
       const { data: profileData } = await supabase
         .from('customers')
         .select('*')
