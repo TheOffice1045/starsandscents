@@ -16,6 +16,7 @@ export function WishlistTab() {
       name: item.name,
       price: item.price,
       image: item.image,
+      stock: item.stock || 0,
     });
     
     toast.success('Added to cart');

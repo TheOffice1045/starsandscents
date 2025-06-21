@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/product/ProductCard";
 import { useState, useEffect } from "react";
 import { createBrowserClient } from '@supabase/ssr';
+import { useSiteConfig } from "@/hooks/useSiteConfig";
 
 export default function Home() {
   const [bestSellers, setBestSellers] = useState<any[]>([]);
@@ -13,6 +14,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [loadingNewArrivals, setLoadingNewArrivals] = useState(true);
   const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const siteConfig = useSiteConfig();
 
   // Fetch best sellers from the database
   useEffect(() => {
@@ -124,7 +126,10 @@ export default function Home() {
         <div className="absolute inset-0 bg-black/20">
           <div className="container mx-auto h-full flex items-center justify-end">
             <div className="text-white max-w-md text-left mr-16">
-              <p className="text-sm uppercase tracking-[0.2em] mb-4">Candles Store</p>
+              <p className="text-sm uppercase tracking-[0.2em] mb-2">{siteConfig.name}</p>
+              {siteConfig.description && (
+                <p className="text-xs opacity-90 mb-4">{siteConfig.description}</p>
+              )}
               <h1 className="text-6xl font-medium mb-8">Lavender Candle</h1>
               <Link href="/shop">
                 <Button 

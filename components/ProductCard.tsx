@@ -30,6 +30,7 @@ export function ProductCard({ product }: ProductCardProps) {
       name: product.name,
       price: product.price,
       image: product.image,
+      stock: 0,
     });
   };
 

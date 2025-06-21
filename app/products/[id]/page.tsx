@@ -174,7 +174,8 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       id: product.id,
       name: product.title,
       price: product.price,
-      image: product.images?.[0]?.url || ''
+      image: product.images?.[0]?.url || '',
+      stock: product.quantity || 0
     });
     
     toast.success('Added to Cart', {

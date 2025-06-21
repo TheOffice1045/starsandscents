@@ -672,12 +672,7 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="bg-muted/30 flex justify-between py-2">
-              <span className="text-xs font-medium">Payment Status</span>
-              <Badge variant={order.payment_status === 'paid' ? 'success' : 'warning'}>
-                {order.payment_status === 'paid' ? 'Paid' : 'Pending Payment'}
-              </Badge>
-            </CardFooter>
+           
           </Card>
         </div>
         
@@ -788,7 +783,7 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-xs text-muted-foreground italic">
+              <p className="text-xs text-muted-foreground italic break-all whitespace-pre-wrap">
                 {order.notes || 'No notes from customer'}
               </p>
             </CardContent>

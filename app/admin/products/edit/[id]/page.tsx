@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AdminButton } from "@/components/ui/admin-button";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -68,8 +69,9 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [newTag, setNewTag] = useState("");
-  const [activeTab, setActiveTab] = useState("general");
+  const [chargeTax, setChargeTax] = useState(false);
   const [collections, setCollections] = useState<{id: string, name: string}[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   
@@ -204,60 +206,63 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       supabase.removeChannel(productChannel);
       supabase.removeChannel(imageChannel);
     };
-  }, [productId, supabase]);
+  }, [supabase, productId]);
 
-  // Fetch initial product data
+  // Fetch product data
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        setLoading(true);
-        
-        // Fetch product details
+        // Fetch the product with its images
         const { data: productData, error: productError } = await supabase
           .from('products')
           .select('*')
           .eq('id', productId)
           .single();
-        
+
         if (productError) {
-          toast.error("Failed to load product");
-          router.push('/admin/products');
+          console.error('Error fetching product:', productError);
+          toast.error(`Failed to fetch product: ${productError.message}`);
           return;
         }
-        
-        // Fetch product images
-        const { data: imageData, error: imageError } = await supabase
+
+        // Fetch product images separately
+        const { data: imagesData, error: imagesError } = await supabase
           .from('product_images')
           .select('*')
           .eq('product_id', productId)
           .order('position', { ascending: true });
-        
-        if (imageError) {
-          console.error('Error fetching images:', imageError);
+
+        if (imagesError) {
+          console.error('Error fetching images:', imagesError);
+          toast.error(`Failed to fetch images: ${imagesError.message}`);
+          return;
         }
-        
-        setProduct({
+
+        // Combine product data with images
+        const product = {
           ...productData,
-          images: imageData || []
-        });
+          images: imagesData || []
+        };
+
+        setProduct(product);
+        setChargeTax(product.taxable || false);
       } catch (err) {
-        console.error('Error fetching product:', err);
-        toast.error("An error occurred while loading the product");
+        console.error('Error in product fetch:', err);
+        toast.error("An error occurred while fetching the product");
       } finally {
         setLoading(false);
       }
     };
-    
-    fetchProduct();
-  }, [productId, router, supabase]);
 
-  // Handle form input changes
+    if (productId) {
+      fetchProduct();
+    }
+  }, [supabase, productId]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    
     setProduct(prev => {
       if (!prev) return prev;
-      
       return {
         ...prev,
         [name]: value
@@ -265,212 +270,189 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     });
   };
 
-  // Handle numeric input changes with validation
   const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    
-    // Allow empty values (will be treated as null)
-    if (value === '') {
-      setProduct(prev => {
-        if (!prev) return prev;
-        return { ...prev, [name]: null };
-      });
-      return;
-    }
-    
-    // Validate numeric input
-    const numValue = parseFloat(value);
-    if (!isNaN(numValue)) {
-      setProduct(prev => {
-        if (!prev) return prev;
-        return { ...prev, [name]: numValue };
-      });
-    }
-  };
-
-  // Handle select changes
-  const handleSelectChange = (name: string, value: string | null) => {
-    // Wrap in requestAnimationFrame instead of setTimeout for better performance
-    requestAnimationFrame(() => {
-      setProduct(prev => {
-        if (!prev) return prev;
-        
-        return {
-          ...prev,
-          [name]: value
-        };
-      });
-    });
-  };
-
-  // Handle tag management
-  const addTag = () => {
-    if (!newTag.trim()) return;
-    
     setProduct(prev => {
       if (!prev) return prev;
-      
-      const currentTags = prev.tags || [];
-      if (currentTags.includes(newTag.trim())) {
-        return prev; // Tag already exists
-      }
-      
       return {
         ...prev,
-        tags: [...currentTags, newTag.trim()]
+        [name]: value === '' ? null : parseFloat(value)
       };
     });
-    
-    setNewTag("");
+  };
+
+  const handleSelectChange = (name: string, value: string | null) => {
+    setProduct(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [name]: value
+      };
+    });
+  };
+
+  const addTag = () => {
+    if (newTag.trim() && product && (!product.tags || !product.tags.includes(newTag.trim()))) {
+      setProduct(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          tags: [...(prev.tags || []), newTag.trim()]
+        };
+      });
+      setNewTag("");
+    }
   };
 
   const removeTag = (tagToRemove: string) => {
     setProduct(prev => {
-      if (!prev || !prev.tags) return prev;
-      
+      if (!prev) return prev;
       return {
         ...prev,
-        tags: prev.tags.filter(tag => tag !== tagToRemove)
+        tags: (prev.tags || []).filter(tag => tag !== tagToRemove)
       };
     });
   };
 
-  // Handle image upload
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || !files.length || !product) return;
-    
+    if (!files || files.length === 0 || !product) return;
+
+    setUploadingImage(true);
+
     try {
-      setUploadingImage(true);
-      
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      const uploadPromises = Array.from(files).map(async (file) => {
+        // Create unique filename
         const fileExt = file.name.split('.').pop();
-        // Create a shorter filename using a timestamp instead of the original filename
-        const fileName = `${product.id}-${Date.now()}-${i}.${fileExt}`;
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
         const filePath = `product-images/${fileName}`;
-        
-        // Check file size before uploading
-        if (file.size > 5 * 1024 * 1024) { // 5MB limit
-          toast.error(`File too large: ${file.name} (max size: 5MB)`);
-          continue;
-        }
-        
-        // Upload image to storage - using 'product-images' bucket instead of 'products'
-        const { error: uploadError } = await supabase
-          .storage
-          .from('product-images') // Changed from 'products' to 'product-images'
+
+        // Upload to storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('product-images')
           .upload(filePath, file);
-          
+
         if (uploadError) {
-          console.error('Error uploading image:', JSON.stringify(uploadError));
-          toast.error(`Upload failed: ${uploadError.message || 'Unknown error'}`);
-          continue;
+          console.error('Upload error:', uploadError);
+          throw uploadError;
         }
-        
-        // Get public URL - also update bucket name here
-        const { data: urlData } = supabase
-          .storage
-          .from('product-images') // Changed from 'products' to 'product-images'
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('product-images')
           .getPublicUrl(filePath);
-        
-        // Add image to product_images table
-        const position = product.images.length > 0 
-          ? Math.max(...product.images.map(img => img.position)) + 1 
-          : 0;
-          
-        const { data: imageData, error: imageError } = await supabase
+
+        // Save image record to database
+        const { data: imageRecord, error: dbError } = await supabase
           .from('product_images')
           .insert({
             product_id: product.id,
-            url: urlData.publicUrl,
+            url: publicUrl,
             alt_text: product.title,
-            position
+            position: (product.images?.length || 0) + 1
           })
           .select()
           .single();
-          
-        if (imageError) {
-          console.error('Error saving image record:', {
-            code: imageError?.code || 'no_code',
-            message: imageError?.message || 'no_message',
-            details: imageError?.details || 'no_details'
-          });
-          toast.error(`Database error: ${imageError.message || 'Failed to save image'}`);
-          continue;
-        }
-        
-        // Update local state
-        setProduct(prev => {
-          if (!prev) return prev;
-          
-          return {
-            ...prev,
-            images: [...prev.images, imageData]
-          };
-        });
-        
-        toast.success(`Image uploaded: ${file.name}`);
-      }
-    } catch (err) {
-      console.error('Error in image upload:', err);
-      toast.error(`Upload error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setUploadingImage(false);
-    }
-  };
 
-  // Handle image deletion
-  const handleDeleteImage = async (imageId: string) => {
-    if (!product) return;
-    
-    try {
-      // Delete image record from database
-      const { error } = await supabase
-        .from('product_images')
-        .delete()
-        .eq('id', imageId);
-        
-      if (error) {
-        console.error('Error deleting image:', error);
-        toast.error("Failed to delete image");
-        return;
-      }
+        if (dbError) {
+          console.error('Database error:', dbError);
+          throw dbError;
+        }
+
+        return imageRecord;
+      });
+
+      const newImages = await Promise.all(uploadPromises);
       
       // Update local state
       setProduct(prev => {
         if (!prev) return prev;
-        
+        return {
+          ...prev,
+          images: [...(prev.images || []), ...newImages]
+        };
+      });
+
+      toast.success(`${newImages.length} image(s) uploaded successfully`);
+    } catch (error: any) {
+      console.error('Error uploading images:', error);
+      toast.error(`Failed to upload images: ${error.message}`);
+    } finally {
+      setUploadingImage(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleDeleteImage = async (imageId: string) => {
+    if (!product) return;
+
+    try {
+      // Find the image to delete
+      const imageToDelete = product.images.find(img => img.id === imageId);
+      if (!imageToDelete) return;
+
+      // Extract file path from URL
+      const urlParts = imageToDelete.url.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      const filePath = `product-images/${fileName}`;
+
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from('product-images')
+        .remove([filePath]);
+
+      if (storageError) {
+        console.error('Storage deletion error:', storageError);
+        // Continue with database deletion even if storage deletion fails
+      }
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('product_images')
+        .delete()
+        .eq('id', imageId);
+
+      if (dbError) {
+        console.error('Database deletion error:', dbError);
+        toast.error(`Failed to delete image: ${dbError.message}`);
+        return;
+      }
+
+      // Update local state
+      setProduct(prev => {
+        if (!prev) return prev;
         return {
           ...prev,
           images: prev.images.filter(img => img.id !== imageId)
         };
       });
-      
+
       toast.success("Image deleted successfully");
-    } catch (err) {
-      console.error('Error in image deletion:', err);
-      toast.error("An error occurred while deleting the image");
+    } catch (error: any) {
+      console.error('Error deleting image:', error);
+      toast.error(`Failed to delete image: ${error.message}`);
     }
   };
 
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!product) return;
     
-    // Validate product data
-    const validation = validateProduct(product);
-    if (!validation.valid) {
-      validation.errors.forEach(error => toast.error(error));
-      return;
-    }
+    setSaving(true);
     
     try {
-      setSaving(true);
+      // Validate product data
+      const validation = validateProduct(product);
+      if (!validation.valid) {
+        toast.error(validation.errors[0]);
+        return;
+      }
       
-      // Prepare the data to update
+      // Prepare product data for update
       const productData = {
         title: product.title,
         description: product.description,
@@ -488,11 +470,9 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         seo_title: product.seo_title,
         seo_description: product.seo_description,
         collection_id: product.collection_id,
-        updated_at: new Date().toISOString() // Add updated timestamp
+        taxable: chargeTax,
+        updated_at: new Date().toISOString()
       };
-      
-      // Log the product data being sent
-      console.log('Updating product with data:', productData);
       
       // Update product in database
       const { data, error } = await supabase
@@ -560,7 +540,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
               Back
             </AdminButton>
           </Link>
-          <h1 className="text-lg font-semibold"><span className="text-gray-500">Editing</span> &quot;{product.title}&quot;</h1>
+          <h1 className="text-lg font-semibold">Edit Products</h1>
         </div>
         <div className="flex gap-2">
           <AdminButton 
@@ -568,7 +548,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
             variant="outline" 
             onClick={() => router.push('/admin/products')}
           >
-            Cancel
+            Discard
           </AdminButton>
           <AdminButton size="sm"
             onClick={handleSubmit}
@@ -579,178 +559,62 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
           </AdminButton>
         </div>
       </div>
-
-      {/* Product Edit Form */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4 p-1 bg-gray-100 rounded-full">
-          <TabsTrigger value="general" className="rounded-full">General</TabsTrigger>
-          <TabsTrigger value="images" className="rounded-full">Images</TabsTrigger>
-          <TabsTrigger value="inventory" className="rounded-full">Inventory</TabsTrigger>
-          <TabsTrigger value="seo" className="rounded-full">SEO</TabsTrigger>
-        </TabsList>
-        
-        {/* General Tab */}
-        <TabsContent value="general" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Information</CardTitle>
-              <CardDescription>
-                Basic information about your product
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4">
+      
+      <div className="grid grid-cols-[2fr,1fr] gap-6">
+        {/* Left Column */}
+        <div className="space-y-6">
+          {/* Product Details */}
+          <div className="bg-white rounded-lg border p-6">
+            <h2 className="text-base font-medium mb-4">Product Details</h2>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  id="title"
+                  name="title"
+                  value={product.title}
+                  onChange={handleChange}
+                  placeholder="Product title"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Title</Label>
+                  <Label htmlFor="sku">SKU (Stock Keeping Unit)</Label>
                   <Input
-                    id="title"
-                    name="title"
-                    value={product.title}
+                    id="sku"
+                    name="sku"
+                    value={product.sku || ""}
                     onChange={handleChange}
-                    placeholder="Product title"
+                    placeholder="SKU (optional)"
                   />
                 </div>
-                
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    value={product.description}
+                  <Label htmlFor="barcode">Barcode (ISBN, UPC, GTIN, etc.)</Label>
+                  <Input
+                    id="barcode"
+                    name="barcode"
+                    value={product.barcode || ""}
                     onChange={handleChange}
-                    placeholder="Product description"
-                    rows={5}
+                    placeholder="Barcode (optional)"
                   />
                 </div>
-                
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Price</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                        $
-                      </span>
-                      <Input
-                        id="price"
-                        name="price"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={product.price}
-                        onChange={handleNumericChange}
-                        className="pl-8"
-                      />
-                    </div>
-                  </div>
-                  
-                 
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="cost_per_item">Cost per Item</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                        $
-                      </span>
-                      <Input
-                        id="cost_per_item"
-                        name="cost_per_item"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={product.cost_per_item ?? ''}
-                        onChange={handleNumericChange}
-                        className="pl-8"
-                        placeholder="Optional"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="compare_at_price">Compare at Price</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                        $
-                      </span>
-                      <Input
-                        id="compare_at_price"
-                        name="compare_at_price"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={product.compare_at_price ?? ''}
-                        onChange={handleNumericChange}
-                        className="pl-8"
-                        placeholder="Optional"
-                      />
-                    </div>
-                  </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="vendor">Vendor</Label>
+                  <Input
+                    id="vendor"
+                    name="vendor"
+                    value={product.vendor || ''}
+                    onChange={handleChange}
+                    placeholder="Vendor name (optional)"
+                  />
                 </div>
-                
-                <div className="grid grid-cols-3 gap-4">
-                  
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="collection">Collection</Label>
-                    <Select
-                      value={product.collection_id || 'none'}
-                      onValueChange={(value) => handleSelectChange('collection_id', value === 'none' ? null : value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select collection" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Collection</SelectItem>
-                        {collections.map(collection => (
-                          <SelectItem key={collection.id} value={collection.id}>
-                            {collection.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select
-                      value={product.status}
-                      onValueChange={(value) => handleSelectChange('status', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="vendor">Vendor</Label>
-                    <Input
-                      id="vendor"
-                      name="vendor"
-                      value={product.vendor || ''}
-                      onChange={handleChange}
-                      placeholder="Vendor name (optional)"
-                    />
-                  </div>
-                </div>
-                
+
                 <div className="space-y-2">
                   <Label>Tags</Label>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {product.tags && product.tags.map(tag => (
-                      <div key={tag} className="flex items-center bg-gray-100 rounded-full px-3 py-1 text-sm">
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => removeTag(tag)}
-                          className="ml-2 text-gray-500 hover:text-gray-700"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
                   <div className="flex gap-2">
                     <Input
                       value={newTag}
@@ -767,210 +631,311 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                       <Plus className="h-4 w-4" />
                     </AdminButton>
                   </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        {/* Images Tab */}
-        <TabsContent value="images" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Images</CardTitle>
-              <CardDescription>
-                Upload and manage product images
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-center w-full">
-                <label
-                  htmlFor="image-upload"
-                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                >
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <Upload className="w-8 h-8 mb-2 text-gray-500" />
-                    <p className="mb-2 text-sm text-gray-500">
-                      <span className="font-semibold">Click to upload</span> or drag and drop
-                    </p>
-                    <p className="text-xs text-gray-500">PNG, JPG or WEBP (MAX. 5MB)</p>
-                  </div>
-                  <input
-                    id="image-upload"
-                    type="file"
-                    className="hidden"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageUpload}
-                    disabled={uploadingImage}
-                  />
-                </label>
-              </div>
-              
-              {uploadingImage && (
-                <div className="flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 animate-spin text-gray-500 mr-2" />
-                  <p className="text-sm text-gray-500">Uploading images...</p>
-                </div>
-              )}
-              
-              {product.images && product.images.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                  {product.images.map((image) => (
-                    <div key={image.id} className="relative aspect-square rounded-md overflow-hidden border border-gray-200 group">
-                      <div className="relative h-32 w-32">
-                        <Image
-                          src={image.url}
-                          alt={image.alt_text || product.title}
-                          fill
-                          className="object-cover rounded-md"
-                        />
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {product.tags && product.tags.map(tag => (
+                      <div key={tag} className="flex items-center bg-gray-100 rounded-full px-3 py-1 text-sm">
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => removeTag(tag)}
+                          className="ml-2 text-gray-500 hover:text-gray-700"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteImage(image.id)}
-                        className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">No images uploaded yet</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        {/* Inventory Tab */}
-        <TabsContent value="inventory" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Inventory Information</CardTitle>
-              <CardDescription>
-                Manage stock and inventory details
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sku">SKU (Stock Keeping Unit)</Label>
-                  <Input
-                    id="sku"
-                    name="sku"
-                    value={product.sku || ''}
-                    onChange={handleChange}
-                    placeholder="SKU (optional)"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="barcode">Barcode (ISBN, UPC, GTIN, etc.)</Label>
-                  <Input
-                    id="barcode"
-                    name="barcode"
-                    value={product.barcode || ''}
-                    onChange={handleChange}
-                    placeholder="Barcode (optional)"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Quantity</Label>
-                  <Input
-                    id="quantity"
-                    name="quantity"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={product.quantity}
-                    onChange={handleNumericChange}
-                    placeholder="Quantity in stock"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="weight">Weight</Label>
-                    <Input
-                      id="weight"
-                      name="weight"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={product.weight || ''}
-                      onChange={handleNumericChange}
-                      placeholder="Weight (optional)"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="weight_unit">Weight Unit</Label>
-                    <Select
-                      value={product.weight_unit || 'kg'}
-                      onValueChange={(value) => handleSelectChange('weight_unit', value)}
-                    >
-                      <SelectTrigger id="weight_unit">
-                        <SelectValue placeholder="Select unit" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="g">Grams (g)</SelectItem>
-                        <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                        <SelectItem value="oz">Ounces (oz)</SelectItem>
-                        <SelectItem value="lb">Pounds (lb)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    ))}
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        {/* SEO Tab */}
-        <TabsContent value="seo" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Search Engine Optimization</CardTitle>
-              <CardDescription>
-                Improve your product&apos;s visibility in search results
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="seo_title">SEO Title</Label>
+
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  value={product.description}
+                  onChange={handleChange}
+                  placeholder="Product description"
+                  rows={5}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Product Images */}
+          <div className="bg-white rounded-lg border p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-medium">Product Images</h2>
+              <button className="text-sm text-primary hover:underline">
+                Add media from URL
+              </button>
+            </div>
+            <div className="flex items-center justify-center w-full mb-4">
+              <label
+                htmlFor="image-upload"
+                className="relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-white hover:bg-white"
+              >
+                <div className="text-center">
+                  <Upload className="w-10 h-10 mx-auto mb-3 text-gray-400" />
+                  <p className="font-semibold text-gray-600">Drop your images here</p>
+                  <p className="text-xs text-gray-500 mt-1">PNG or JPG (max. 5MB)</p>
+                  <div className="mt-4">
+                    <AdminButton type="button" variant="outline" size="sm" asChild>
+                      <span className="cursor-pointer">
+                        <Upload className="w-4 h-4 mr-2" />
+                        Select images
+                      </span>
+                    </AdminButton>
+                  </div>
+                </div>
+                <input
+                  id="image-upload"
+                  type="file"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  accept="image/png, image/jpeg"
+                  multiple
+                  onChange={handleImageUpload}
+                  disabled={uploadingImage}
+                  ref={fileInputRef}
+                />
+              </label>
+            </div>
+
+            {uploadingImage && (
+              <div className="flex items-center justify-center">
+                <Loader2 className="w-6 h-6 animate-spin text-gray-500 mr-2" />
+                <p className="text-sm text-gray-500">Uploading images...</p>
+              </div>
+            )}
+            
+            {product.images && product.images.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                {product.images.map((image) => (
+                  <div key={image.id} className="relative aspect-square rounded-md overflow-hidden border border-gray-200 group">
+                    <Image
+                      src={image.url}
+                      alt={image.alt_text || product.title}
+                      fill
+                      className="object-cover rounded-md"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteImage(image.id)}
+                      className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              !uploadingImage && (
+                <div className="text-center py-4">
+                  <p className="text-gray-500 text-sm">No images uploaded yet.</p>
+                </div>
+              )
+            )}
+          </div>
+
+          {/* SEO */}
+          <div className="bg-white rounded-lg border p-6">
+            <h2 className="text-base font-medium mb-4">Search Engine Optimization</h2>
+            <div className="space-y-4">
+              <div>
+                <Label>Page Title</Label>
                 <Input
                   id="seo_title"
                   name="seo_title"
                   value={product.seo_title || ''}
                   onChange={handleChange}
-                  placeholder="SEO title (defaults to product title if empty)"
+                  placeholder="Enter page title"
                 />
-                <p className="text-xs text-gray-500">
-                  Recommended: 50-60 characters
-                </p>
               </div>
-              
-              {/* SEO Tab */}
-              <div className="space-y-2">
-                <Label htmlFor="seo_description">SEO Description</Label>
+              <div>
+                <Label>Meta Description</Label>
                 <Textarea
                   id="seo_description"
                   name="seo_description"
                   value={product.seo_description || ''}
                   onChange={handleChange}
-                  placeholder="SEO description (optional)"
+                  placeholder="Enter meta description"
                   rows={3}
                 />
-                <p className="text-xs text-gray-500">Recommended: 150-160 characters</p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column */}
+        <div className="space-y-6">
+          {/* Pricing */}
+          <div className="bg-white rounded-lg border p-6">
+            <h2 className="text-base font-medium mb-4">Pricing</h2>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="price">Price</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                    $
+                  </span>
+                  <Input
+                    id="price"
+                    name="price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={product.price}
+                    onChange={handleNumericChange}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cost_per_item">Cost per Item</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                    $
+                  </span>
+                  <Input
+                    id="cost_per_item"
+                    name="cost_per_item"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={product.cost_per_item ?? ''}
+                    onChange={handleNumericChange}
+                    className="pl-8"
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="compare_at_price">Compare at Price</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                    $
+                  </span>
+                  <Input
+                    id="compare_at_price"
+                    name="compare_at_price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={product.compare_at_price ?? ''}
+                    onChange={handleNumericChange}
+                    className="pl-8"
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Charge tax on this product</Label>
+                <Switch checked={chargeTax} onCheckedChange={setChargeTax} />
+              </div>
+            </div>
+          </div>
+
+          {/* Inventory */}
+          <div className="bg-white rounded-lg border p-6">
+            <h2 className="text-base font-medium mb-4">Inventory</h2>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity</Label>
+                <Input
+                  id="quantity"
+                  name="quantity"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={product.quantity}
+                  onChange={handleNumericChange}
+                  placeholder="Quantity in stock"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="weight">Weight</Label>
+                  <Input
+                    id="weight"
+                    name="weight"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={product.weight || ''}
+                    onChange={handleNumericChange}
+                    placeholder="Weight (optional)"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="weight_unit">Weight Unit</Label>
+                  <Select
+                    value={product.weight_unit || 'kg'}
+                    onValueChange={(value) => handleSelectChange('weight_unit', value)}
+                  >
+                    <SelectTrigger id="weight_unit">
+                      <SelectValue placeholder="Select unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="g">Grams (g)</SelectItem>
+                      <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                      <SelectItem value="oz">Ounces (oz)</SelectItem>
+                      <SelectItem value="lb">Pounds (lb)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Status */}
+          <div className="bg-white rounded-lg border p-6">
+            <h2 className="text-base font-medium mb-4">Status</h2>
+            <div>
+              <Label>Set the product status.</Label>
+              <Select
+                value={product.status}
+                onValueChange={(value) => handleSelectChange("status", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Collection */}
+          <div className="bg-white rounded-lg border p-6">
+            <h2 className="text-base font-medium mb-4">Collection</h2>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="collection">Collection</Label>
+                <Select
+                  value={product.collection_id || 'none'}
+                  onValueChange={(value) => handleSelectChange('collection_id', value === 'none' ? null : value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select collection" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Collection</SelectItem>
+                    {collections.map(collection => (
+                      <SelectItem key={collection.id} value={collection.id}>
+                        {collection.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

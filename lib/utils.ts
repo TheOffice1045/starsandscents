@@ -88,6 +88,7 @@ export function formatTags(tags: string[] | null | undefined): string {
 export function validateProduct(product: any): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
+  // Required fields
   if (!product.title || product.title.trim() === '') {
     errors.push('Product title is required');
   }
@@ -96,20 +97,35 @@ export function validateProduct(product: any): { valid: boolean; errors: string[
     errors.push('Product description is required');
   }
   
-  if (product.price === undefined || product.price === null || isNaN(product.price)) {
+  // Numeric fields
+  if (typeof product.price !== 'number' || isNaN(product.price)) {
     errors.push('Valid product price is required');
   } else if (product.price < 0) {
     errors.push('Product price cannot be negative');
   }
   
-  if (product.quantity === undefined || product.quantity === null || isNaN(product.quantity)) {
+  if (typeof product.quantity !== 'number' || isNaN(product.quantity)) {
     errors.push('Valid product quantity is required');
   } else if (product.quantity < 0) {
     errors.push('Product quantity cannot be negative');
   }
   
+  // Optional numeric fields
+  if (product.compare_at_price !== null && (typeof product.compare_at_price !== 'number' || isNaN(product.compare_at_price))) {
+    errors.push('Compare at price must be a valid number');
+  }
+
+  if (product.cost_per_item !== null && (typeof product.cost_per_item !== 'number' || isNaN(product.cost_per_item))) {
+    errors.push('Cost per item must be a valid number');
+  }
+
+  if (product.weight !== null && (typeof product.weight !== 'number' || isNaN(product.weight))) {
+    errors.push('Weight must be a valid number');
+  }
+  
+  // Status validation
   if (!product.status || !['active', 'draft'].includes(product.status)) {
-    errors.push('Valid product status is required');
+    errors.push('Valid product status is required (active or draft)');
   }
   
   return {

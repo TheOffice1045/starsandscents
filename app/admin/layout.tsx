@@ -3,11 +3,13 @@
 import { Inter as GeistSans } from 'next/font/google';
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, ShoppingCart, Package, Users, DollarSign, Settings, ChevronDown, ChevronRight, Home, FolderOpen, BoxesIcon, ClipboardCheck, ClipboardList, PackageCheck, Store } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Package, Users, DollarSign, Settings, ChevronDown, ChevronRight, Home, FolderOpen, BoxesIcon, ClipboardCheck, ClipboardList, PackageCheck, Store, TicketPercent, Wallet } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { useState, useEffect } from "react";
 import { createBrowserClient } from "@supabase/ssr";
+import { AdminContext } from "@/contexts/admin-context";
 import '@/styles/admin.css';
+import "../../styles/waldenburg.css";
 
 const geist = GeistSans({ 
   subsets: ['latin'],
@@ -43,8 +45,8 @@ const sidebarItems: SidebarItem[] = [
     ]
   },
   { label: "Customers", href: "/admin/customers", icon: Users },
-  { label: "Finance", href: "/admin/finance", icon: DollarSign },
-  { label: "Discounts", href: "/admin/discounts", icon: DollarSign },
+  { label: "Finance", href: "/admin/finance", icon: Wallet },
+  { label: "Discounts", href: "/admin/discounts", icon: TicketPercent },
   { label: "My Store", href: "/", icon: Store, target: "_blank", rel: "noopener noreferrer" },
 ];
 
@@ -64,8 +66,8 @@ export default function AdminLayout({
   useEffect(() => {
     setMounted(true);
     
-    // Check if user has admin privileges
-    const checkAdminAccess = async () => {
+    // Check if user is logged in
+    const checkAuth = async () => {
       try {
         // Get the current user session
         const { data: { session } } = await supabase.auth.getSession();
@@ -76,32 +78,9 @@ export default function AdminLayout({
           return;
         }
         
-        // Get the user's role
-        const { data: storeUser, error } = await supabase
-          .from('store_users')
-          .select('role_id, store_roles(name)')
-          .eq('user_id', session.user.id)
-          .single();
-        
-        if (error || !storeUser) {
-          // Redirect to homepage if user has no role
-          router.push('/');
-          return;
-        }
-        
-        // Check if the user has admin or owner role
-        const roleName = storeUser.store_roles?.[0]?.name?.toLowerCase();
-        const hasAccess = roleName === 'admin' || roleName === 'owner';
-        
-        if (!hasAccess) {
-          // Redirect to homepage if not admin or owner
-          router.push('/');
-          return;
-        }
-        
         setIsAuthorized(true);
       } catch (error) {
-        console.error('Error checking admin access:', error);
+        console.error('Error checking auth:', error);
         // Redirect to homepage on error
         router.push('/');
       } finally {
@@ -109,7 +88,7 @@ export default function AdminLayout({
       }
     };
     
-    checkAdminAccess();
+    checkAuth();
   }, [router, supabase]);
 
   // Prevent hydration mismatch by rendering a simple loading state
@@ -149,11 +128,12 @@ export default function AdminLayout({
   }
 
   return (
-    <div className={`${geist.className} h-screen flex flex-col`}>
+    <AdminContext.Provider value={{ isAdmin: true }}>
+      <div className="font-waldenburg h-screen flex flex-col">
       <AdminHeader className="border-b" />
       <div className="flex-1 flex overflow-hidden">
         <aside className="w-64 bg-white border-r flex flex-col">
-          <nav className="px-4 pt-6 flex-1 overflow-y-auto divide-y divide-gray-100">
+            <nav className="px-4 pt-6 flex-1 overflow-y-auto">
             {sidebarItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
@@ -240,5 +220,6 @@ export default function AdminLayout({
         </main>
       </div>
     </div>
+    </AdminContext.Provider>
   );
 }

@@ -19,6 +19,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { AdminButton } from "@/components/ui/admin-button";
 
 export default function EditDiscountPage() {
   const router = useRouter();
@@ -270,16 +271,16 @@ export default function EditDiscountPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Link href="/admin/discounts">
-            <Button variant="ghost" size="icon">
+            <AdminButton variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
-            </Button>
+            </AdminButton>
           </Link>
           <h1 className="text-2xl font-semibold">Edit Discount</h1>
         </div>
-        <Button onClick={handleButtonClick} disabled={isSubmitting}>
+        <AdminButton onClick={handleButtonClick} disabled={isSubmitting}>
           {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Save Changes
-        </Button>
+        </AdminButton>
       </div>
       
       <form onSubmit={handleSubmit}>
@@ -393,7 +394,7 @@ export default function EditDiscountPage() {
                   <label className="text-sm font-medium">Start Date</label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
+                      <AdminButton
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal",
@@ -405,7 +406,7 @@ export default function EditDiscountPage() {
                         ) : (
                           <span>Pick a date</span>
                         )}
-                      </Button>
+                      </AdminButton>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
@@ -421,7 +422,7 @@ export default function EditDiscountPage() {
                   <label className="text-sm font-medium">Expiry Date</label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
+                      <AdminButton
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal",
@@ -433,7 +434,7 @@ export default function EditDiscountPage() {
                         ) : (
                           <span>No expiry date</span>
                         )}
-                      </Button>
+                      </AdminButton>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar

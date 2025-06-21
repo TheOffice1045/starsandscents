@@ -1,11 +1,50 @@
 .admin-dropdown {
   z-index: 9995;
+  font-family: 'Waldenburg', system-ui, sans-serif !important;
+  font-size: 13px !important;
 }
 
 .admin-submenu {
   z-index: 9996;
+  font-family: 'Waldenburg', system-ui, sans-serif !important;
+  font-size: 13px !important;
 }
 
 .admin-modal {
   z-index: 9999;
+  font-family: 'Waldenburg', system-ui, sans-serif !important;
+}
+
+/* Admin form elements */
+.admin-select,
+.admin-input,
+.admin-textarea {
+  font-family: 'Waldenburg', system-ui, sans-serif !important;
+  font-size: 13px !important;
+}
+
+/* Admin table elements */
+.admin-table th,
+.admin-table td {
+  font-family: 'Waldenburg', system-ui, sans-serif !important;
+}
+
+/* Admin navigation elements */
+.admin-nav,
+.admin-nav-item {
+  font-family: 'Waldenburg', system-ui, sans-serif !important;
+}
+
+/* Admin dropdown elements */
+[role="menu"],
+[role="menuitem"],
+[role="menuitemcheckbox"],
+[role="menuitemradio"] {
+  font-size: 13px !important;
+}
+
+.select-black-focus:focus {
+  outline: none !important;
+  border-color: #e5e7eb !important;
+  box-shadow: 0 0 0 0.5px #e5e7eb !important;
 }

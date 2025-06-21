@@ -1,0 +1,12 @@
+@font-face {
+  font-family: 'Waldenburg';
+  src: url('/fonts/Waldenburg.woff2') format('woff2'),
+       url('/fonts/Waldenburg.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-waldenburg {
+  font-family: 'Waldenburg', system-ui, sans-serif !important;
+} 

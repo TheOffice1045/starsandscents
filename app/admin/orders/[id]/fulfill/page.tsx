@@ -16,8 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { createBrowserClient } from "@supabase/ssr";
 import type { CartItem } from '@/lib/store/cart';
+import { AdminButton } from "@/components/ui/admin-button";
+import { useSettingsStore } from "@/lib/store/settings";
 
 interface TrackingInfo {
   trackingNumber: string;
@@ -41,7 +45,16 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
   const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   const orderId = params.id;
   const orderNumber = `#${orderId}`;
-  const locationAddress = "33 New Montgomery St";
+  const { settings } = useSettingsStore();
+
+  // Format the store address
+  const storeAddress = [
+    settings.address?.line1,
+    settings.address?.line2,
+    settings.address?.city,
+    settings.address?.state,
+    settings.address?.postcode
+  ].filter(Boolean).join(", ");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notifyCustomer, setNotifyCustomer] = useState(true);
@@ -49,6 +62,8 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
   const [orderStatus, setOrderStatus] = useState('unfulfilled');
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [fulfillmentMethod, setFulfillmentMethod] = useState("shipping");
 
   // Consolidated fetch function
   const fetchOrderData = useCallback(async () => {
@@ -84,12 +99,25 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
         return;
       }
       
+      // Fetch order items from order_items table
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', orderId);
+      if (itemsError) {
+        console.error('Error fetching order items:', itemsError);
+        toast.error('Failed to load order items');
+        setOrderItems([]);
+      } else {
+        setOrderItems(itemsData || []);
+      }
+      
       console.log('Order data received:', orderData);
       
       // Set the order with items from the order data
       setOrder({
         ...orderData,
-        items: orderData.items || []
+        items: itemsData || [] // fallback for legacy code
       });
       
       // Set order status
@@ -139,8 +167,8 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
     setIsSubmitting(true);
   
     try {
-      // Validate tracking information
-      if (trackingInfos.some(info => !info.trackingNumber || !info.carrier)) {
+      // Validate tracking information only if shipping
+      if (fulfillmentMethod === "shipping" && trackingInfos.some(info => !info.trackingNumber || !info.carrier)) {
         toast.error("Please fill in all tracking information");
         setIsSubmitting(false);
         return;
@@ -151,7 +179,8 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
         .from('orders')
         .update({
           fulfillment_status: 'fulfilled',
-          tracking_info: trackingInfos,
+          tracking_info: fulfillmentMethod === "shipping" ? trackingInfos : null,
+          shipping_method: fulfillmentMethod, // Save the fulfillment method
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
@@ -196,7 +225,7 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
               </Link>
               <h1 className="text-sm font-medium truncate max-w-md">Fulfill items - {order.order_number}</h1>
             </div>
-            <Button variant="outline">Print packing slip</Button>
+            <AdminButton variant="outline">Print packing slip</AdminButton>
           </div>
 
           <div className="grid grid-cols-3 gap-6">
@@ -226,7 +255,7 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
                 </div>
 
                 <div className="space-y-4">
-                  {order?.items?.map((item, index) => (
+                  {orderItems.map((item, index) => (
                     <div key={index} className="flex items-center gap-4 py-4 border-t">
                       <div className="w-16 h-16 bg-gray-100 rounded">
                         <Image 
@@ -265,62 +294,82 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
                     </Button>
                   </div>
 
-                  <div className="space-y-4">
-                    <h3 className="font-medium">Tracking information</h3>
-                    {trackingInfos.map((info, index) => (
-                      <div key={index} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-sm text-gray-600 mb-1 block">
-                              Tracking number
-                            </label>
-                            <Input
-                              placeholder="Enter tracking number"
-                              value={info.trackingNumber}
-                              onChange={(e) => updateTrackingInfo(index, 'trackingNumber', e.target.value)}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm text-gray-600 mb-1 block">
-                              Shipping carrier
-                            </label>
-                            <Select
-                              value={info.carrier}
-                              onValueChange={(value) => updateTrackingInfo(index, 'carrier', value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select carrier" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {carriers.map((carrier) => (
-                                  <SelectItem key={carrier.id} value={carrier.id}>
-                                    {carrier.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        {trackingInfos.length > 1 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeTrackingInfo(index)}
-                            className="text-red-600"
-                          >
-                            Remove
-                          </Button>
-                        )}
+                  <div className="space-y-2">
+                  <h3 className="font-medium mb-4">Fulfillment Method</h3>
+                    <RadioGroup defaultValue="shipping" onValueChange={setFulfillmentMethod} className="flex items-center gap-6">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="shipping" id="shipping" />
+                        <Label htmlFor="shipping" className="font-normal">Shipping</Label>
                       </div>
-                    ))}
-                    <Button
-                      variant="link"
-                      className="text-blue-600 p-0"
-                      onClick={addTrackingNumber}
-                    >
-                      + Add another tracking number
-                    </Button>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="pickup" id="pickup" />
+                        <Label htmlFor="pickup" className="font-normal">Pickup</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="direct_delivery" id="direct_delivery" />
+                        <Label htmlFor="direct_delivery" className="font-normal">Direct Delivery</Label>
+                      </div>
+                    </RadioGroup>
                   </div>
+
+                  {fulfillmentMethod === "shipping" && (
+                    <div>
+                     
+                      {trackingInfos.map((info, index) => (
+                        <div key={index} className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-sm text-gray-600 mb-1 block">
+                                Tracking number
+                              </label>
+                              <Input
+                                placeholder="Enter tracking number"
+                                value={info.trackingNumber}
+                                onChange={(e) => updateTrackingInfo(index, 'trackingNumber', e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-sm text-gray-600 mb-1 block">
+                                Shipping carrier
+                              </label>
+                              <Select
+                                value={info.carrier}
+                                onValueChange={(value) => updateTrackingInfo(index, 'carrier', value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select carrier" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {carriers.map((carrier) => (
+                                    <SelectItem key={carrier.id} value={carrier.id}>
+                                      {carrier.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          {trackingInfos.length > 1 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeTrackingInfo(index)}
+                              className="text-red-600"
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      <Button
+                        variant="link"
+                        className="text-blue-600 p-0"
+                        onClick={addTrackingNumber}
+                      >
+                        + Add another tracking number
+                      </Button>
+                    </div>
+                  )}
 
                   <div>
                     <h3 className="font-medium mb-4">Notify customer of shipment</h3>
@@ -353,7 +402,7 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
                         : orderStatus === 'partially_fulfilled'
                           ? 'Partially Fulfilled'
                           : 'Unfulfilled'}
-                      {orderStatus !== 'fulfilled' && order?.items?.length > 0 ? ` (${order.items.length})` : ''}
+                      {orderStatus !== 'fulfilled' && orderItems.length > 0 ? ` (${orderItems.length})` : ''}
                     </span>
                     <Button variant="ghost" size="sm">•••</Button>
                   </div>
@@ -365,7 +414,7 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
                 </div>
 
                 <div className="space-y-4">
-                  {order?.items?.map((item, index) => (
+                  {orderItems.map((item, index) => (
                     <div key={index} className="flex items-center justify-between py-4 border-t first:border-t-0">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-gray-100 rounded-md overflow-hidden">
@@ -393,13 +442,13 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
               <div className="bg-white rounded-lg border p-6">
                 <h2 className="font-medium mb-4">Shipping from</h2>
                 <div className="text-sm">
-                  <div className="font-medium">Your store</div>
-                  <div className="text-gray-500">{locationAddress}</div>
+                  <div className="font-medium">{settings.name || 'Your store'}</div>
+                  <div className="text-gray-500">{storeAddress}</div>
                 </div>
               </div>
 
               <div className="flex justify-end">
-                <Button 
+                <AdminButton 
                   onClick={handleFulfillment} 
                   disabled={isSubmitting}
                   className="w-full"
@@ -412,7 +461,7 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
                   ) : (
                     'Mark as fulfilled'
                   )}
-                </Button>
+                </AdminButton>
               </div>
             </div>
           </div>

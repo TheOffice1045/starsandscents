@@ -48,7 +48,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
+import { MoreVertical } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { GripVertical } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -56,12 +72,31 @@ const formSchema = z.object({
   status: z.enum(["Active", "Inactive"]).default("Active"),
 });
 
+// DraggableRow for collections
+function DraggableRow({ id, children, handle, ...props }: { id: string; children: React.ReactNode; handle?: (args: { listeners: any }) => React.ReactNode; [key: string]: any }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    background: isDragging ? '#f3f4f6' : undefined,
+  };
+  return (
+    <tr ref={setNodeRef} style={style} {...attributes} {...props}>
+      <td className="pl-2 pr-0 w-6 align-middle cursor-grab select-none" style={{ verticalAlign: 'middle' }}>
+        {typeof handle === 'function' ? handle({ listeners }) : null}
+      </td>
+      {children}
+    </tr>
+  );
+}
+
 export default function CollectionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [collectionOrder, setCollectionOrder] = useState<string[]>([]);
   
   const { collections, setCollections, addCollection, updateCollection, deleteCollection, toggleStatus: storeToggleStatus } = useCollectionStore();
   const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
@@ -253,6 +288,25 @@ export default function CollectionsPage() {
     }
   };
 
+  useEffect(() => {
+    const newOrder = filteredCollections.map((c) => c.id);
+    if (JSON.stringify(collectionOrder) !== JSON.stringify(newOrder)) {
+      setCollectionOrder(newOrder);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredCollections]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    if (active && over && active.id !== over.id) {
+      setCollectionOrder((prev) => arrayMove(prev, prev.indexOf(active.id), prev.indexOf(over.id)));
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -265,11 +319,9 @@ export default function CollectionsPage() {
               Add Collection
             </AdminButton>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="font-waldenburg text-[13px]">
             <DialogHeader>
-              <DialogTitle>
-                {editingId ? "Edit Collection" : "Add Collection"}
-              </DialogTitle>
+              <DialogTitle className="font-waldenburg text-xl font-semibold">{editingId ? "Edit Collection" : "Add Collection"}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -278,9 +330,9 @@ export default function CollectionsPage() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Name</FormLabel>
+                      <FormLabel className="font-waldenburg text-[13px]">Name</FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        <Input {...field} className="font-waldenburg text-[13px]" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -291,13 +343,9 @@ export default function CollectionsPage() {
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description</FormLabel>
+                      <FormLabel className="font-waldenburg text-[13px]">Description</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          {...field} 
-                          rows={4}
-                          placeholder="Enter collection description"
-                        />
+                        <Textarea {...field} rows={4} placeholder="Enter collection description" className="font-waldenburg text-[13px]" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -309,24 +357,22 @@ export default function CollectionsPage() {
                   render={({ field }) => (
                     <FormItem className="flex items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
-                        <FormLabel className="text-base">Active Status</FormLabel>
-                        <div className="text-sm text-gray-500">
+                        <FormLabel className="font-waldenburg text-[13px] text-base">Active Status</FormLabel>
+                        <div className="text-sm text-gray-500 font-waldenburg text-[13px]">
                           Collection will be {field.value === "Active" ? "visible" : "hidden"} in shop
                         </div>
                       </div>
                       <FormControl>
                         <Switch
                           checked={field.value === "Active"}
-                          onCheckedChange={(checked) => 
-                            field.onChange(checked ? "Active" : "Inactive")
-                          }
+                          onCheckedChange={(checked) => field.onChange(checked ? "Active" : "Inactive")}
                         />
                       </FormControl>
                     </FormItem>
                   )}
                 />
-                <div className="flex justify-end gap-2">
-                  <Button
+                <div className="flex justify-end gap-2 mt-4">
+                  <AdminButton
                     type="button"
                     variant="outline"
                     onClick={() => {
@@ -334,12 +380,13 @@ export default function CollectionsPage() {
                       setEditingId(null);
                       form.reset();
                     }}
+                    className="h-10 px-6 font-waldenburg text-[13px]"
                   >
                     Cancel
-                  </Button>
-                  <Button type="submit">
+                  </AdminButton>
+                  <AdminButton type="submit" className="h-10 px-6 font-waldenburg text-[13px]">
                     {editingId ? "Save Changes" : "Create Collection"}
-                  </Button>
+                  </AdminButton>
                 </div>
               </form>
             </Form>
@@ -377,88 +424,107 @@ export default function CollectionsPage() {
       </div>
 
       {/* List View */}
-      {viewMode === "list" && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b">
-                <th className="px-6 py-4 text-left text-sm font-medium text-gray-500">Collection Name</th>
-                <th className="px-6 py-4 text-left text-sm font-medium text-gray-500">Description</th>
-                <th className="px-6 py-4 text-left text-sm font-medium text-gray-500">Products</th>
-                <th className="px-6 py-4 text-left text-sm font-medium text-gray-500">Status</th>
-                <th className="px-6 py-4 text-right text-sm font-medium text-gray-500">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredCollections.map((collection) => (
-                <tr key={collection.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 font-medium">{collection.name}</td>
-                  <td className="px-6 py-4 text-gray-500 text-xs">{collection.description}</td>
-                  <td className="px-6 py-4">{collection.productCount}</td>
-                  <td className="px-6 py-4">
-                    <Button
-                      variant="ghost"
-                      onClick={() => toggleStatus(collection.id)}
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                        collection.status === "Active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {collection.status}
-                    </Button>
-                  </td>
-                 
-                  <td className="px-6 py-4 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(collection)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <DropdownMenuItem 
-                              className="text-red-600"
-                              onSelect={(e) => {
-                                e.preventDefault();
-                              }}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Collection</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete this collection? This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteCollection(collection.id)}
-                                className="bg-red-500 hover:bg-red-600"
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {viewMode === 'list' && (
+        <Card className="border-0">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto w-full">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={collectionOrder}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <table className="w-full" style={{ border: '1px solid #e5e5e5', borderRadius: '12px', overflow: 'hidden' }}>
+                    <thead>
+                      <tr className="border-b" style={{ background: '#f5f5f5', color: '#0a0a0a' }}>
+                        <th className="pl-2 pr-0 w-6"></th>
+                        <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Collection Name</th>
+                        <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Description</th>
+                        <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Products</th>
+                        <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Status</th>
+                        <th className="px-10 py-3 text-right align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {collectionOrder.map((id) => {
+                        const collection = filteredCollections.find((c) => c.id === id);
+                        if (!collection) return null;
+                        return (
+                          <DraggableRow key={collection.id} id={collection.id} handle={({ listeners }) => (
+                            <span {...listeners} aria-label="Drag row" tabIndex={0} className="flex items-center justify-center h-6 w-6 text-gray-400 hover:text-gray-600 focus:outline-none">
+                              <GripVertical className="h-4 w-4" />
+                            </span>
+                          )}>
+                            <td className="px-10 py-3 font-medium text-sm text-left align-middle whitespace-nowrap">{collection.name}</td>
+                            <td className="px-10 py-3 text-gray-500 text-xs text-left align-middle whitespace-nowrap">{collection.description}</td>
+                            <td className="px-10 py-3 text-left align-middle whitespace-nowrap">{collection.productCount}</td>
+                            <td className="px-10 py-3 text-left align-middle whitespace-nowrap">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                collection.status === "Active"
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}>
+                                {collection.status}
+                              </span>
+                            </td>
+                            <td className="px-10 py-3 text-right align-middle whitespace-nowrap">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEdit(collection)}>
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <DropdownMenuItem 
+                                        className="text-red-600"
+                                        onSelect={(e) => {
+                                          e.preventDefault();
+                                        }}
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Delete Collection</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Are you sure you want to delete this collection? This action cannot be undone.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => deleteCollection(collection.id)}
+                                          className="bg-red-500 hover:bg-red-600"
+                                        >
+                                          Delete
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </td>
+                          </DraggableRow>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </SortableContext>
+              </DndContext>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Grid View */}

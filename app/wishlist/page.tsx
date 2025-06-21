@@ -18,7 +18,8 @@ export default function WishlistPage() {
       id: item.id,
       name: item.name,
       price: item.price,
-      image: item.image
+      image: item.image,
+      stock: item.stock || 0
     });
     
     toast.success('Added to cart', {

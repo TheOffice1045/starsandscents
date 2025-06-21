@@ -85,6 +85,7 @@ export default function SettingsPage() {
               .insert({
                 store_id: newStore.id,
                 store_name: 'My Store',
+                store_slogan: '',
                 time_zone: 'America/New_York',
                 auto_dst: true,
                 reviews_enabled: false,
@@ -103,6 +104,7 @@ export default function SettingsPage() {
             // Update settings state with defaults
             updateSettings({
               name: 'My Store',
+              slogan: '',
               timeZone: 'America/New_York',
               autoDST: true,
               reviewsEnabled: false,
@@ -152,6 +154,7 @@ export default function SettingsPage() {
             .insert({
               store_id: storeData.id,
               store_name: '',
+              store_slogan: '',
               time_zone: 'America/New_York',
               auto_dst: true,
               reviews_enabled: false,
@@ -173,6 +176,7 @@ export default function SettingsPage() {
         // If we have existing settings, update the state
         updateSettings({
           name: settingsData.store_name || '',
+          slogan: settingsData.store_slogan || '',
           logo: settingsData.store_logo || '',
           address: {
             line1: settingsData.address_line1 || '',

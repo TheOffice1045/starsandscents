@@ -17,6 +17,9 @@ import { MoreHorizontal, Eye, Edit, Trash2 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { AdminEllipsisMenu } from '@/components/admin/AdminEllipsisMenu';
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 
 // Update the order tabs to include "Fulfilled"
@@ -68,6 +71,8 @@ export default function OrdersPage() {
    fulfilledAmount: 0,
    paidAmount: 0
  });
+ const [currentPage, setCurrentPage] = useState(1);
+ const [pageSize, setPageSize] = useState(10);
 
 
  // First, let's calculate the totals for each category in the fetchOrders function
@@ -254,26 +259,32 @@ export default function OrdersPage() {
 
 
  const handleDeleteOrder = async (orderId: string) => {
-   if (confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
-     try {
-       const { error } = await supabase
-         .from('orders')
-         .delete()
-         .eq('id', orderId);
-      
-       if (error) throw error;
-      
-       toast.success('Order deleted successfully');
-       fetchOrders();
-     } catch (error) {
-       console.error('Error deleting order:', error);
-       toast.error('Failed to delete order');
-     }
+   if (!confirm('Are you sure you want to delete this order?')) {
+     return;
+   }
+   
+   try {
+     const { error } = await supabase
+       .from('orders')
+       .delete()
+       .eq('id', orderId);
+     
+     if (error) throw error;
+     
+     toast.success('Order deleted successfully');
+     fetchOrders(); // Refresh the orders list
+   } catch (error: any) {
+     console.error('Error deleting order:', error);
+     toast.error('Failed to delete order');
    }
  };
 
 
- // Add this function after handleDeleteOrder
+ const handleEditOrder = (orderId: string) => {
+   router.push(`/admin/orders/${orderId}/edit`);
+ };
+
+
  const handleConfirmPayment = async (orderId: string) => {
    try {
      const { error } = await supabase
@@ -344,6 +355,34 @@ export default function OrdersPage() {
   
    toast.success("Export successful");
  };
+
+
+ const columns = [
+   { key: 'order_number', label: 'Order', width: '120px', sticky: true, render: (row: Order) => row.order_number },
+   { key: 'created_at', label: 'Date', width: '160px', render: (row: Order) => formatDate(row.created_at) },
+   { key: 'customer_name', label: 'Customer', width: '180px', render: (row: Order) => row.customer_name || 'Guest' },
+   { key: 'payment_status', label: 'Payment', width: '120px', render: (row: Order) => row.payment_status },
+   { key: 'fulfillment_status', label: 'Fulfillment', width: '120px', render: (row: Order) => row.fulfillment_status },
+   { key: 'total', label: 'Total', width: '100px', align: 'right', render: (row: Order) => `$${row.total.toFixed(2)}` },
+   { key: 'actions', label: 'Actions', width: '100px', align: 'right', render: (row: Order) => (
+     <AdminEllipsisMenu>
+       <DropdownMenuItem onClick={() => router.push(`/admin/orders/${row.id}`)}>
+         View
+       </DropdownMenuItem>
+       <DropdownMenuItem onClick={() => handleEditOrder(row.id)}>
+         Edit
+       </DropdownMenuItem>
+       <DropdownMenuItem onClick={() => handleDeleteOrder(row.id)} className="text-red-600">
+         Delete
+       </DropdownMenuItem>
+     </AdminEllipsisMenu>
+   ) },
+ ];
+
+
+ // Calculate paginated orders
+ const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+ const paginatedOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
 
  return (
@@ -444,98 +483,81 @@ export default function OrdersPage() {
 
 
      {/* Tabs */}
-     <div className="border-b">
-       <nav className="-mb-px flex space-x-6 overflow-x-auto">
-         {orderTabs.map((tab) => (
-           <button
+     <div className="flex items-center justify-between mt-2 mb-4">
+       <ToggleGroup
+         type="single"
+         value={activeTab}
+         onValueChange={val => val && setActiveTab(val as OrderTab)}
+         className="bg-[#f5f5f5] p-1 rounded-xl font-waldenburg text-[13px] h-10"
+         aria-label="Order status tabs"
+       >
+         {orderTabs.map(tab => (
+           <ToggleGroupItem
              key={tab}
-             onClick={() => setActiveTab(tab)}
-             className={`py-3 px-1 text-sm font-medium border-b-2 whitespace-nowrap ${
-               tab === activeTab
-                 ? "border-[#4A332F] text-[#4A332F]"
-                 : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-             }`}
+             value={tab}
+             className={
+               `px-2 py-0.5 font-waldenburg text-[13px] transition-all
+               ${activeTab === tab
+                 ? '!bg-white shadow border-none text-gray-900 rounded-lg h-8 min-w-[80px] z-10'
+                 : 'bg-transparent text-[#0a0a0a] hover:bg-white hover:text-gray-900 border border-transparent rounded-lg h-8 min-w-[80px]'}
+               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300`
+             }
+             style={{ fontWeight: 500 }}
            >
              {tab}
-           </button>
+           </ToggleGroupItem>
          ))}
-       </nav>
+       </ToggleGroup>
      </div>
 
 
      {/* Search and Filter */}
-     <div className="flex flex-col sm:flex-row gap-4">
+     <div className="flex gap-4 items-center">
        <div className="relative flex-1">
          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
          <Input
            placeholder="Search by order ID or customer..."
-           className="pl-10 text-sm"
+           className="pl-10 h-9 text-sm"
            value={searchQuery}
            onChange={(e) => setSearchQuery(e.target.value)}
          />
        </div>
-       <div className="flex gap-2">
-         <DropdownMenu>
-           <DropdownMenuTrigger asChild>
-             <AdminButton variant="outline" size="sm">
-               <Filter className="w-4 h-4 mr-2" />
-               {timeFrame === "all" ? "All Time" :
-                timeFrame === "today" ? "Today" :
-                timeFrame === "yesterday" ? "Yesterday" :
-                timeFrame === "last7days" ? "Last 7 Days" :
-                timeFrame === "last30days" ? "Last 30 Days" :
-                timeFrame === "thisMonth" ? "This Month" :
-                timeFrame === "lastMonth" ? "Last Month" : "Filter by Time"}
-             </AdminButton>
-           </DropdownMenuTrigger>
-           <DropdownMenuContent align="end" className="w-48">
-             <DropdownMenuItem onClick={() => setTimeFrame("all")}>
-               All Time
-             </DropdownMenuItem>
-             <DropdownMenuItem onClick={() => setTimeFrame("today")}>
-               Today
-             </DropdownMenuItem>
-             <DropdownMenuItem onClick={() => setTimeFrame("yesterday")}>
-               Yesterday
-             </DropdownMenuItem>
-             <DropdownMenuItem onClick={() => setTimeFrame("last7days")}>
-               Last 7 Days
-             </DropdownMenuItem>
-             <DropdownMenuItem onClick={() => setTimeFrame("last30days")}>
-               Last 30 Days
-             </DropdownMenuItem>
-             <DropdownMenuItem onClick={() => setTimeFrame("thisMonth")}>
-               This Month
-             </DropdownMenuItem>
-             <DropdownMenuItem onClick={() => setTimeFrame("lastMonth")}>
-               Last Month
-             </DropdownMenuItem>
-           </DropdownMenuContent>
-         </DropdownMenu>
-         <AdminButton
-           variant="outline"
-           size="sm"
-           onClick={handleExportCSV}
-         >
-           <Download className="w-4 h-4 mr-2" />
-           Export
-         </AdminButton>
-       </div>
+       <select
+         className="border rounded px-2 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+         value={timeFrame}
+         onChange={e => setTimeFrame(e.target.value)}
+       >
+         <option value="all">All Time</option>
+         <option value="today">Today</option>
+         <option value="yesterday">Yesterday</option>
+         <option value="last7days">Last 7 Days</option>
+         <option value="last30days">Last 30 Days</option>
+         <option value="thisMonth">This Month</option>
+         <option value="lastMonth">Last Month</option>
+       </select>
+       <AdminButton
+         variant="outline"
+         size="sm"
+         className="h-9 px-4 py-2 rounded-md font-normal"
+         onClick={handleExportCSV}
+       >
+         Export
+       </AdminButton>
      </div>
 
 
      {/* Orders Table */}
-     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+     <div>
        <table className="min-w-full">
          <thead>
-           <tr className="bg-gray-50 border-b">
-             <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
-             <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-             <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-             <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
-             <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fulfillment</th>
-             <th className="py-3 px-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-             <th className="py-3 px-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+           <tr className="border-b" style={{ background: '#f5f5f5', color: '#0a0a0a' }}>
+             <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Order</th>
+             <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Date</th>
+             <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Customer</th>
+             <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Payment</th>
+             <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Fulfillment</th>
+             <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Total</th>
+             <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Actions</th>
            </tr>
          </thead>
          <tbody className="divide-y divide-gray-200">
@@ -545,20 +567,20 @@ export default function OrdersPage() {
                  Loading orders...
                </td>
              </tr>
-           ) : filteredOrders.length > 0 ? (
-             filteredOrders.map((order) => (
-               <tr key={order.id} className="hover:bg-gray-50 text-sm">
-                 <td className="py-3 px-4">
+           ) : paginatedOrders.length > 0 ? (
+             paginatedOrders.map((order) => (
+               <tr key={order.id} className="hover:bg-gray-50 text-sm align-middle">
+                 <td className="py-3 px-10 text-left align-middle">
                    <button
                      onClick={() => router.push(`/admin/orders/${order.id}`)}
-                     className="text-blue-600 hover:text-blue-800 font-medium"
+                     className="text-gray-700 hover:text-gray-700 hover:underline font-medium text-sm "
                    >
                      {order.order_number}
                    </button>
                  </td>
-                 <td className="py-3 px-4 text-gray-500">{formatDate(order.created_at)}</td>
-                 <td className="py-3 px-4">{order.customer_name || 'Guest'}</td>
-                 <td className="py-3 px-4">
+                 <td className="py-3 px-10 text-left align-middle text-gray-500">{formatDate(order.created_at)}</td>
+                 <td className="py-3 px-10 text-left align-middle">{order.customer_name || 'Guest'}</td>
+                 <td className="py-3 px-10 text-left align-middle">
                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                      order.payment_status === "paid" ? "bg-green-100 text-green-800" :
                      order.payment_status === "authorized" ? "bg-blue-100 text-blue-800" :
@@ -567,7 +589,7 @@ export default function OrdersPage() {
                      {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
                    </span>
                  </td>
-                 <td className="py-3 px-4">
+                 <td className="py-3 px-10 text-left align-middle">
                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                      order.fulfillment_status === "unfulfilled" ? "bg-yellow-100 text-yellow-800" :
                      order.fulfillment_status === "partially_fulfilled" ? "bg-orange-100 text-orange-800" :
@@ -578,40 +600,19 @@ export default function OrdersPage() {
                      ).join(' ')}
                    </span>
                  </td>
-                 <td className="py-3 px-4 text-right font-medium">${order.total.toFixed(2)}</td>
-                 <td className="py-3 px-4 text-right">
-                   <DropdownMenu>
-                     <DropdownMenuTrigger asChild>
-                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                         <span className="sr-only">Open menu</span>
-                         <MoreHorizontal className="h-4 w-4" />
-                       </Button>
-                     </DropdownMenuTrigger>
-                  
-                     <DropdownMenuContent align="end">
-                       <DropdownMenuItem onClick={() => router.push(`/admin/orders/${order.id}`)}>
-                         <Eye className="mr-2 h-4 w-4" />
-                         <span>View</span>
-                       </DropdownMenuItem>
-                       <DropdownMenuItem onClick={() => router.push(`/admin/orders/${order.id}/edit`)}>
-                         <Edit className="mr-2 h-4 w-4" />
-                         <span>Edit</span>
-                       </DropdownMenuItem>
-                       {order.payment_status !== 'paid' && (
-                         <DropdownMenuItem onClick={() => handleConfirmPayment(order.id)}>
-                           <CheckCircle className="mr-2 h-4 w-4" />
-                           <span>Confirm Payment</span>
-                         </DropdownMenuItem>
-                       )}
-                       <DropdownMenuItem
-                         className="text-red-600"
-                         onClick={() => handleDeleteOrder(order.id)}
-                       >
-                         <Trash2 className="mr-2 h-4 w-4" />
-                         <span>Delete</span>
-                       </DropdownMenuItem>
-                     </DropdownMenuContent>
-                   </DropdownMenu>
+                 <td className="py-3 px-10 text-left align-middle font-normal">${order.total.toFixed(2)}</td>
+                 <td className="py-3 px-10 text-left align-middle">
+                   <AdminEllipsisMenu>
+                     <DropdownMenuItem onClick={() => router.push(`/admin/orders/${order.id}`)}>
+                       View
+                     </DropdownMenuItem>
+                     <DropdownMenuItem onClick={() => handleEditOrder(order.id)}>
+                       Edit
+                     </DropdownMenuItem>
+                     <DropdownMenuItem onClick={() => handleDeleteOrder(order.id)} className="text-red-600">
+                       Delete
+                     </DropdownMenuItem>
+                   </AdminEllipsisMenu>
                  </td>
                </tr>
              ))
@@ -623,15 +624,15 @@ export default function OrdersPage() {
              </tr>
            )}
            {/* Summary row for totals */}
-           {filteredOrders.length > 0 && (
+           {paginatedOrders.length > 0 && (
              <tr className="bg-gray-50 font-medium border-t-2 border-gray-300">
-               <td colSpan={5} className="py-3 px-4 text-right text-gray-500 text-xs">
-                 Order Summary ({filteredOrders.length} orders):
+               <td colSpan={5} className="py-3 px-10 text-left text-gray-500 text-xs">
+                 Order Summary ({paginatedOrders.length} orders):
                </td>
-               <td className="py-3 px-4 text-right text-black-700 font-bold text-sm">
-                 ${filteredOrders.reduce((sum, order) => sum + order.total, 0).toFixed(2)}
+               <td className="py-3 px-10 text-left text-black-700 font-medium text-sm">
+                 ${paginatedOrders.reduce((sum, order) => sum + order.total, 0).toFixed(2)}
                </td>
-               <td className="py-3 px-4"></td>
+               <td className="py-3 px-10"></td>
              </tr>
            )}
          </tbody>
@@ -640,52 +641,52 @@ export default function OrdersPage() {
 
 
      {/* Pagination */}
-     <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
-       <div className="flex flex-1 justify-between sm:hidden">
-         <Button
-           variant="outline"
-           size="sm"
-           className="hover:bg-gray-100 text-gray-700 hover:text-gray-900 rounded-full"
+     <div className="mt-4 flex items-center justify-between">
+       <div className="flex items-center gap-4">
+         <Select
+           value={pageSize.toString()}
+           onValueChange={(value) => {
+             setPageSize(Number(value));
+             setCurrentPage(1); // Reset to first page when changing page size
+           }}
          >
-           Previous
-         </Button>
-         <Button
-           variant="outline"
-           size="sm"
-           className="hover:bg-gray-100 text-gray-700 hover:text-gray-900 rounded-full"
-         >
-           Next
-         </Button>
-       </div>
-       <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-         <div>
-           <p className="text-sm text-gray-700">
-             Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredOrders.length}</span> of{' '}
-             <span className="font-medium">{orders.length}</span> results
-           </p>
+           <SelectTrigger className="h-9 w-[120px]">
+             <SelectValue>{pageSize} per page</SelectValue>
+           </SelectTrigger>
+           <SelectContent>
+             <SelectItem value="10">10 per page</SelectItem>
+             <SelectItem value="25">25 per page</SelectItem>
+             <SelectItem value="50">50 per page</SelectItem>
+             <SelectItem value="100">100 per page</SelectItem>
+           </SelectContent>
+         </Select>
+         <div className="text-sm text-muted-foreground">
+           {filteredOrders.length} total orders
          </div>
-         <div>
-           <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-             <Button
-               variant="outline"
-               size="sm"
-               className="rounded-l-md"
-               disabled={true} // We'll implement pagination logic later
-             >
-               Previous
-             </Button>
-             <div className="flex items-center">
-               <span className="px-4 text-sm text-gray-700">Page 1 of 1</span>
-             </div>
-             <Button
-               variant="outline"
-               size="sm"
-               className="rounded-r-md"
-               disabled={true} // We'll implement pagination logic later
-             >
-               Next
-             </Button>
-           </nav>
+       </div>
+       <div className="flex items-center space-x-6 lg:space-x-8">
+         <div className="flex w-[100px] items-center justify-center text-sm font-medium">
+           Page {currentPage} of {totalPages}
+         </div>
+         <div className="flex items-center space-x-2">
+           <AdminButton
+             variant="outline"
+             size="sm"
+             className="h-9 px-4 py-2 rounded-md"
+             onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+             disabled={currentPage === 1}
+           >
+             Previous
+           </AdminButton>
+           <AdminButton
+             variant="outline"
+             size="sm"
+             className="h-9 px-4 py-2 rounded-md"
+             onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+             disabled={currentPage === totalPages}
+           >
+             Next
+           </AdminButton>
          </div>
        </div>
      </div>

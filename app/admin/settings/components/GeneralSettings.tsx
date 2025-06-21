@@ -44,6 +44,10 @@ export default function GeneralSettings({ storeId }: GeneralSettingsProps) {
     updateSettings({ name: e.target.value });
   };
 
+  const handleSloganChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    updateSettings({ slogan: e.target.value });
+  };
+
   const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -127,6 +131,7 @@ export default function GeneralSettings({ storeId }: GeneralSettingsProps) {
         .upsert({
           store_id: storeId,
           store_name: settings.name || '',
+          store_slogan: settings.slogan || '',
           store_logo: settings.logo || '',
           address_line1: settings.address?.line1 || '',
           address_line2: settings.address?.line2 || '',
@@ -166,6 +171,20 @@ export default function GeneralSettings({ storeId }: GeneralSettingsProps) {
               value={settings.name}
               onChange={handleNameChange}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Store Slogan
+            </label>
+            <Input 
+              placeholder="Enter store slogan"
+              value={settings.slogan || ''}
+              onChange={handleSloganChange}
+            />
+            <p className="mt-2 text-sm text-gray-500">
+              A catchy slogan that describes your store (optional).
+            </p>
           </div>
 
           <div>

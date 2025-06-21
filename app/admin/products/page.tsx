@@ -1,15 +1,16 @@
 "use client";
 
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Pencil, Search, MoreHorizontal, Trash2, Check, X, HelpCircle, Loader2, Plus, ArrowUp, ArrowDown } from "lucide-react";
+import { Pencil, Search, MoreHorizontal, MoreVertical, Trash2, Check, X, HelpCircle, Loader2, Plus, ArrowUp, ArrowDown, GripVertical } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { formatPrice, formatStatus, truncateText } from "@/lib/utils";
 import { AdminButton } from "@/components/ui/admin-button";
@@ -17,6 +18,23 @@ import { ProductImage } from "@/components/ui/product-image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import {CSS} from '@dnd-kit/utilities';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Fragment } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface Product {
   id: string;
@@ -37,8 +55,8 @@ interface Product {
   seo_description?: string;
   created_at?: string;
   updated_at?: string;
-  collection?: { id: string; name: string; };
   images: { id: string; url: string; alt_text?: string; position: number; }[];
+  collections?: { id: string; name: string; slug?: string; is_featured?: boolean }[];
 }
 
 interface DuplicateProduct {
@@ -49,6 +67,23 @@ interface DuplicateProduct {
   title?: string;
   sku?: string | null;
   // ... other properties ...
+}
+
+function DraggableRow({ id, children, handle, ...props }: { id: string; children: React.ReactNode; handle?: (args: { listeners: any }) => React.ReactNode; [key: string]: any }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    background: isDragging ? '#f3f4f6' : undefined,
+  };
+  return (
+    <tr ref={setNodeRef} style={style} {...attributes} {...props}>
+      <td className="pl-2 pr-0 w-6 align-middle cursor-grab select-none" style={{ verticalAlign: 'middle' }}>
+        {typeof handle === 'function' ? handle({ listeners }) : null}
+      </td>
+      {children}
+    </tr>
+  );
 }
 
 export default function ProductsPage() {
@@ -62,37 +97,146 @@ export default function ProductsPage() {
   const [sortField, setSortField] = useState<string>("title");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const router = useRouter();
+  const pathname = usePathname();
   const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const [productOrder, setProductOrder] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [priceMin, setPriceMin] = useState<string>('');
+  const [priceMax, setPriceMax] = useState<string>('');
+  const [stockStatusFilter, setStockStatusFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [collections, setCollections] = useState<{id: string, name: string}[]>([]);
+  const [bulkCollectionDialogOpen, setBulkCollectionDialogOpen] = useState(false);
+  const [bulkCollectionId, setBulkCollectionId] = useState<string>("");
+  const [bulkPriceDialogOpen, setBulkPriceDialogOpen] = useState(false);
+  const [bulkPrice, setBulkPrice] = useState<string>("");
+  
+  // Fetch collections for category filter
+  useEffect(() => {
+    const fetchCollections = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('collections')
+          .select('id, name')
+          .order('name', { ascending: true });
+          
+        if (error) {
+          console.error('Error fetching collections:', error);
+          return;
+        }
+        
+        setCollections(data || []);
+      } catch (err) {
+        console.error('Error in collections fetch:', err);
+      }
+    };
+    
+    fetchCollections();
+  }, [supabase]);
   
   // Fetch products and set up real-time subscription
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .order('created_at', { ascending: false });
         
-        if (error) {
-          console.error('Error fetching products:', error);
+        // Build filter query for count
+        let countQuery = supabase
+          .from('products')
+          .select('*', { count: 'exact', head: true });
+        if (statusFilter !== 'all') {
+          countQuery = countQuery.eq('status', statusFilter);
+        }
+        if (priceMin) {
+          countQuery = countQuery.gte('price', Number(priceMin));
+        }
+        if (priceMax) {
+          countQuery = countQuery.lte('price', Number(priceMax));
+        }
+        if (stockStatusFilter !== 'all') {
+          if (stockStatusFilter === 'in_stock') {
+            countQuery = countQuery.gt('quantity', 0);
+          } else if (stockStatusFilter === 'out_of_stock') {
+            countQuery = countQuery.eq('quantity', 0);
+          } else if (stockStatusFilter === 'low_stock') {
+            countQuery = countQuery.lte('quantity', 10).gt('quantity', 0);
+          }
+        }
+        if (categoryFilter !== 'all') {
+          if (categoryFilter === 'uncategorized') {
+            countQuery = countQuery.is('collection_id', null);
+          } else {
+            countQuery = countQuery.eq('collection_id', categoryFilter);
+          }
+        }
+        const { count, error: countError } = await countQuery;
+        setTotalProducts(count || 0);
+        
+        // Build filter query for data
+        let dataQuery = supabase
+          .from('products')
+          .select(`
+            *,
+            product_images(id, url, alt_text, position)
+          `)
+          .order('created_at', { ascending: false });
+        if (statusFilter !== 'all') {
+          dataQuery = dataQuery.eq('status', statusFilter);
+        }
+        if (priceMin) {
+          dataQuery = dataQuery.gte('price', Number(priceMin));
+        }
+        if (priceMax) {
+          dataQuery = dataQuery.lte('price', Number(priceMax));
+        }
+        if (stockStatusFilter !== 'all') {
+          if (stockStatusFilter === 'in_stock') {
+            dataQuery = dataQuery.gt('quantity', 0);
+          } else if (stockStatusFilter === 'out_of_stock') {
+            dataQuery = dataQuery.eq('quantity', 0);
+          } else if (stockStatusFilter === 'low_stock') {
+            dataQuery = dataQuery.lte('quantity', 10).gt('quantity', 0);
+          }
+        }
+        if (categoryFilter !== 'all') {
+          if (categoryFilter === 'uncategorized') {
+            dataQuery = dataQuery.is('collection_id', null);
+          } else {
+            dataQuery = dataQuery.eq('collection_id', categoryFilter);
+          }
+        }
+        const from = (currentPage - 1) * pageSize;
+        const to = from + pageSize - 1;
+        const { data, error } = await dataQuery.range(from, to);
+        if (error || countError) {
+          console.error('Error fetching products:', error || countError);
           toast.error('Failed to load products');
           return;
         }
         
-        // Fetch images for each product
-        const productsWithImages = await Promise.all((data || []).map(async (product) => {
-          const { data: imageData, error: imageError } = await supabase
-            .from('product_images')
-            .select('*')
-            .eq('product_id', product.id)
-            .order('position', { ascending: true });
-            
-          const validImages = imageError ? [] : (imageData || []).filter(img => img.url && img.url.trim() !== "");
-          return { ...product, images: validImages };
+        // Fetch collections separately to avoid foreign key issues
+        const { data: collectionsData } = await supabase
+          .from('collections')
+          .select('id, name, slug, is_featured');
+        
+        const collectionsMap = new Map();
+        (collectionsData || []).forEach((collection: any) => {
+          collectionsMap.set(collection.id, collection);
+        });
+        
+        // Process the data to match the expected format
+        let productsWithCollections = (data || []).map((product: any) => ({
+          ...product,
+          images: (product.product_images || []).filter((img: any) => img.url && img.url.trim() !== ""),
+          collections: product.collection_id && collectionsMap.has(product.collection_id) 
+            ? [collectionsMap.get(product.collection_id)] 
+            : []
         }));
         
-        setProducts(productsWithImages);
+        setProducts(productsWithCollections);
       } catch (err) {
         console.error('Error in fetchProducts:', err);
         toast.error('An error occurred while loading products');
@@ -120,12 +264,59 @@ export default function ProductsPage() {
       .subscribe();
     
     return () => { supabase.removeChannel(channel); };
-  }, [supabase]);
+  }, [currentPage, pageSize, statusFilter, priceMin, priceMax, stockStatusFilter, categoryFilter, supabase]);
+
+  useEffect(() => {
+    if (products.length > 0) {
+      setProductOrder(products.map((p) => p.id));
+    }
+  }, [products]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setProductOrder((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
 
   // Sorting function
   const handleSort = (field: string) => {
     setSortDirection(field === sortField ? (sortDirection === "asc" ? "desc" : "asc") : "asc");
     setSortField(field);
+    // After sorting, update productOrder to match the new filteredInventory order
+    setProductOrder(filteredInventory
+      .slice() // clone to avoid mutating original
+      .sort((a, b) => {
+        const direction = field === sortField && sortDirection === "asc" ? -1 : 1;
+        switch(field) {
+          case "title":
+            return direction * a.title.localeCompare(b.title);
+          case "price":
+            return direction * (a.price - b.price);
+          case "quantity":
+            return direction * ((a.quantity || 0) - (b.quantity || 0));
+          case "sku":
+            return direction * ((a.sku || "").localeCompare(b.sku || ""));
+          case "status":
+            return direction * a.status.localeCompare(b.status);
+          default:
+            return direction * a.title.localeCompare(b.title);
+        }
+      })
+      .map(p => p.id)
+    );
   };
 
   // Filter and sort products
@@ -256,6 +447,58 @@ export default function ProductsPage() {
     }
   };
 
+  // Close dialogs on route change
+  useEffect(() => {
+    setBulkCollectionDialogOpen(false);
+    setBulkPriceDialogOpen(false);
+  }, [pathname]);
+
+  // Bulk apply collection handler
+  const handleBulkApplyCollection = async () => {
+    if (!bulkCollectionId || selectedProducts.length === 0) return;
+    setBulkActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ collection_id: bulkCollectionId })
+        .in('id', selectedProducts);
+      if (error) throw error;
+      toast.success(`Collection applied to ${selectedProducts.length} products`);
+      setSelectedProducts([]);
+      setBulkCollectionDialogOpen(false);
+      setBulkCollectionId("");
+      setBulkPriceDialogOpen(false); // ensure all dialogs close
+      router.refresh?.();
+    } catch (error) {
+      toast.error('Failed to apply collection');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  // Bulk apply price handler
+  const handleBulkApplyPrice = async () => {
+    if (!bulkPrice || selectedProducts.length === 0) return;
+    setBulkActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ price: Number(bulkPrice) })
+        .in('id', selectedProducts);
+      if (error) throw error;
+      toast.success(`Price applied to ${selectedProducts.length} products`);
+      setSelectedProducts([]);
+      setBulkPriceDialogOpen(false);
+      setBulkPrice("");
+      setBulkCollectionDialogOpen(false); // ensure all dialogs close
+      router.refresh?.();
+    } catch (error) {
+      toast.error('Failed to apply price');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
   // Render sort indicator
   const SortIndicator = ({ field }: { field: string }) => (
     sortField === field && (
@@ -283,29 +526,103 @@ export default function ProductsPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
               <Input
                 placeholder="Search products..."
-                className="pl-10"
+                className="pl-10 h-9"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
             
+            {selectedProducts.length > 0 && (
+              <AdminButton
+                variant="count"
+                size="sm"
+              >
+                {selectedProducts.length} selected
+              </AdminButton>
+            )}
+            
+            {/* Filters */}
+            <div className="flex gap-2 items-center">
+              {/* Status Filter */}
+              <select
+                className="border rounded px-2 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+              >
+                <option value="all">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="draft">Draft</option>
+              </select>
+              {/* Stock Status Filter */}
+              <select
+                className="border rounded px-2 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                value={stockStatusFilter}
+                onChange={e => setStockStatusFilter(e.target.value)}
+              >
+                <option value="all">All Stock Status</option>
+                <option value="in_stock">In Stock</option>
+                <option value="out_of_stock">Out of Stock</option>
+                <option value="low_stock">Low Stock</option>
+              </select>
+              {/* Collection Filter */}
+              <select
+                className="border rounded px-2 h-9 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                value={categoryFilter}
+                onChange={e => setCategoryFilter(e.target.value)}
+              >
+                <option value="all">All Collections</option>
+                <option value="uncategorized">Uncategorized</option>
+                {collections.map((collection) => (
+                  <option key={collection.id} value={collection.id}>
+                    {collection.name}
+                  </option>
+                ))}
+              </select>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <AdminButton
+                    variant="outline"
+                    size="sm"
+                    className="h-9 px-4 py-2 rounded-md font-normal"
+                  >
+                    Price Range
+                  </AdminButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="p-2 space-y-2 w-[200px]">
+                  <div className="space-y-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="Min Price"
+                      className="w-full text-sm h-9"
+                      value={priceMin}
+                      onChange={e => setPriceMin(e.target.value)}
+                    />
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="Max Price"
+                      className="w-full text-sm h-9"
+                      value={priceMax}
+                      onChange={e => setPriceMax(e.target.value)}
+                    />
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            
             <div className="flex items-center gap-2">
-              {selectedProducts.length > 0 && (
-                <Badge variant="outline" className="text-sm">
-                  {selectedProducts.length} selected
-                </Badge>
-              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <AdminButton 
-                    variant="outline" 
+                    variant="ghost" 
                     size="sm"
                     disabled={selectedProducts.length === 0}
                   >
                     {bulkActionLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <MoreHorizontal className="h-4 w-4" />
+                      <MoreVertical className="h-4 w-4" />
                     )}
                   </AdminButton>
                 </DropdownMenuTrigger>
@@ -318,10 +635,18 @@ export default function ProductsPage() {
                     <X className="mr-2 h-4 w-4" />
                     Unpublish Selected
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setBulkCollectionDialogOpen(true)}>
+                    <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="5" y="5" rx="2" ry="2" /><path d="M19 5v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5" /></svg>
+                    Bulk Apply Collection
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setBulkPriceDialogOpen(true)}>
+                    <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="7" rx="2"/><path d="M16 11V7a4 4 0 0 0-8 0v4"/></svg>
+                    Bulk Apply Price
+                  </DropdownMenuItem>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <DropdownMenuItem 
-                        className="text-red-600"
+                        className="text-red-600 focus:text-red-600 focus:bg-red-50 text-sm py-1"
                         onSelect={(e) => e.preventDefault()}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
@@ -353,352 +678,553 @@ export default function ProductsPage() {
         </CardContent>
       </Card>
 
+      {/* Bulk Apply Collection Dialog (triggered from dropdown) */}
+      <Dialog open={bulkCollectionDialogOpen} onOpenChange={setBulkCollectionDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bulk Apply Collection</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <select
+              className="select-black-focus border rounded px-2 h-9 w-full text-sm"
+              value={bulkCollectionId}
+              onChange={e => setBulkCollectionId(e.target.value)}
+            >
+              <option value="">Select a collection</option>
+              {collections.map((collection) => (
+                <option key={collection.id} value={collection.id}>{collection.name}</option>
+              ))}
+            </select>
+            <AdminButton
+              onClick={handleBulkApplyCollection}
+              disabled={!bulkCollectionId || bulkActionLoading}
+              className="w-full"
+            >
+              {bulkActionLoading ? 'Applying...' : 'Apply'}
+            </AdminButton>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Apply Price Dialog (triggered from dropdown) */}
+      <Dialog open={bulkPriceDialogOpen} onOpenChange={setBulkPriceDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bulk Apply Price</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="select-black-focus border rounded px-2 h-9 w-full text-sm"
+              placeholder="Enter new price"
+              value={bulkPrice}
+              onChange={e => setBulkPrice(e.target.value)}
+            />
+            <AdminButton
+              onClick={handleBulkApplyPrice}
+              disabled={!bulkPrice || bulkActionLoading}
+              className="w-full"
+            >
+              {bulkActionLoading ? 'Applying...' : 'Apply'}
+            </AdminButton>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Products Table */}
       <Card className="border-0">
         <CardContent className="p-0">
-          {loading ? (
-            <div className="p-4 space-y-4">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <div key={index} className="flex items-center gap-4">
-                  <Skeleton className="h-4 w-4" />
-                  <div className="flex items-center gap-3 flex-1">
-                    <Skeleton className="h-10 w-10" />
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-3 w-48" />
+          <div className="overflow-x-auto w-full">
+            {loading ? (
+              <div className="p-4 space-y-4">
+                {Array.from({ length: 10 }).map((_, index) => (
+                  <div key={index} className="flex items-center gap-4">
+                    {/* Drag handle skeleton */}
+                    <Skeleton className="h-4 w-4 rounded" />
+                    {/* Checkbox skeleton */}
+                    <Skeleton className="h-4 w-4" />
+                    {/* Product column: image + title */}
+                    <div className="flex items-center gap-3 flex-1">
+                      <Skeleton className="h-10 w-10" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-32" style={{ fontSize: 14 }} />
+                      </div>
                     </div>
+                    {/* Description column skeleton */}
+                    <Skeleton className="h-4 w-24" style={{ fontSize: 14 }} />
+                    {/* SKU column skeleton */}
+                    <Skeleton className="h-4 w-16" style={{ fontSize: 14 }} />
+                    {/* Price column skeleton */}
+                    <Skeleton className="h-4 w-20" style={{ fontSize: 14 }} />
+                    {/* Stock column skeleton */}
+                    <Skeleton className="h-4 w-16" style={{ fontSize: 14 }} />
+                    {/* Status column skeleton (badge) */}
+                    <Skeleton className="h-6 w-16 rounded-lg" />
+                    {/* Actions column skeleton */}
+                    <Skeleton className="h-8 w-8" />
                   </div>
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
-              ))}
-            </div>
-          ) : filteredInventory.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b">
-                    <th className="pl-6 pr-2 py-3 text-left">
-                      <Checkbox 
-                        checked={selectedProducts.length === filteredInventory.length && filteredInventory.length > 0}
-                        onCheckedChange={toggleSelectAll}
-                        aria-label="Select all products"
-                      />
-                    </th>
-                    <th 
-                      className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700"
-                      onClick={() => handleSort("title")}
-                    >
-                      <div className="flex items-center">
-                        Product
-                        <SortIndicator field="title" />
-                      </div>
-                    </th>
-                    <th 
-                      className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700"
-                      onClick={() => handleSort("sku")}
-                    >
-                      <div className="flex items-center">
-                        SKU
-                        <SortIndicator field="sku" />
-                      </div>
-                    </th>
-                    {/* Removing the Collections column */}
-                    <th 
-                      className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700"
-                      onClick={() => handleSort("price")}
-                    >
-                      <div className="flex items-center">
-                        Price
-                        <SortIndicator field="price" />
-                      </div>
-                    </th>
-                    <th 
-                      className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700"
-                      onClick={() => handleSort("quantity")}
-                    >
-                      <div className="flex items-center">
-                        Stock
-                        <SortIndicator field="quantity" />
-                      </div>
-                    </th>
-                    <th 
-                      className="px-4 py-3 text-left text-sm font-medium text-gray-500 cursor-pointer hover:text-gray-700"
-                      onClick={() => handleSort("status")}
-                    >
-                      <div className="flex items-center">
-                        Status
-                        <SortIndicator field="status" />
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredInventory.map((product) => {
-                    const statusInfo = formatStatus(product.status);
-                    
-                    return (
-                      <tr key={product.id} className="hover:bg-gray-50">
-                        <td className="pl-6 pr-2 py-3">
-                          <Checkbox 
-                            checked={selectedProducts.includes(product.id)}
-                            onCheckedChange={() => toggleProductSelection(product.id)}
-                            aria-label={`Select ${product.title}`}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <div 
-                            className="flex items-center cursor-pointer" 
-                            onClick={() => handleEdit(product)}
+                ))}
+              </div>
+            ) : filteredInventory.length > 0 ? (
+              <div className="overflow-x-auto">
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={productOrder}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <table className="w-full" style={{ border: '1px solid #e5e5e5', borderRadius: '12px', overflow: 'hidden' }}>
+                      <thead>
+                        <tr className="border-b" style={{ background: '#f5f5f5', color: '#0a0a0a' }}>
+                          <th className="pl-2 pr-0 w-6"></th>
+                          <th className="pl-6 pr-2 py-3 text-left align-middle">
+                            <Checkbox 
+                              checked={selectedProducts.length === filteredInventory.length && filteredInventory.length > 0}
+                              onCheckedChange={toggleSelectAll}
+                              aria-label="Select all products"
+                            />
+                          </th>
+                          <th 
+                            className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap"
+                            onClick={() => handleSort("title")}
+                            style={{ color: '#0a0a0a' }}
                           >
-                            <div className="relative h-10 w-10 mr-3">
-                              <ProductImage 
-                                url={product.images?.[0]?.url} 
-                                alt={product.images?.[0]?.alt_text || `Product: ${product.title}`}
-                              />
-                            </div>
-                            <div>
-                              <div className="font-medium text-[13px]">{product.title}</div>
-                              {product.description && (
-                                <div className="text-[11px] text-gray-500 mt-1">
-                                  {truncateText(product.description, 60)}
-                                </div>
+                            <div className="flex items-center">
+                              Product
+                              {sortField === "title" && (
+                                <span className="ml-1">
+                                  {sortDirection === "asc" ? "↑" : "↓"}
+                                </span>
                               )}
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {product.sku || "-"}
-                        </td>
-                        {/* Removing the Collections cell */}
-                        <td className="px-4 py-3 text-xs font-medium">
-                          {formatPrice(product.price)}
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          <div className="flex items-center">
-                            {editingId === product.id ? (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  type="number"
-                                  value={editValue}
-                                  onChange={(e) => setEditValue(e.target.value)}
-                                  className="w-16 h-7 text-xs"
-                                  autoFocus
+                          </th>
+                          <th 
+                            className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap"
+                            style={{ color: '#0a0a0a' }}
+                          >
+                            Description
+                          </th>
+                          <th 
+                            className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap"
+                            onClick={() => handleSort("sku")}
+                            style={{ color: '#0a0a0a' }}
+                          >
+                            <div className="flex items-center">
+                              SKU
+                              {sortField === "sku" && (
+                                <span className="ml-1">
+                                  {sortDirection === "asc" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                          <th 
+                            className="px-10 py-3 text-right align-middle text-sm font-medium whitespace-nowrap"
+                            onClick={() => handleSort("price")}
+                            style={{ color: '#0a0a0a' }}
+                          >
+                            <div className="flex items-center">
+                              Price
+                              {sortField === "price" && (
+                                <span className="ml-1">
+                                  {sortDirection === "asc" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                          <th 
+                            className="px-10 py-3 text-right align-middle text-sm font-medium whitespace-nowrap"
+                            onClick={() => handleSort("quantity")}
+                            style={{ color: '#0a0a0a' }}
+                          >
+                            <div className="flex items-center">
+                              Stock
+                              {sortField === "quantity" && (
+                                <span className="ml-1">
+                                  {sortDirection === "asc" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                          <th 
+                            className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap"
+                            onClick={() => handleSort("status")}
+                            style={{ color: '#0a0a0a' }}
+                          >
+                            <div className="flex items-center">
+                              Status
+                              {sortField === "status" && (
+                                <span className="ml-1">
+                                  {sortDirection === "asc" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                          <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Stock Status</th>
+                          <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Collection</th>
+                          <th className="px-10 py-3 text-right align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {productOrder.map((id) => {
+                          const product = filteredInventory.find((p) => p.id === id);
+                          if (!product) return null;
+                          const statusInfo = formatStatus(product.status);
+                          const stockStatus = (product.quantity ?? 0) < 5 ? 'Low' : 'In Stock';
+                          return (
+                            <DraggableRow key={product.id} id={product.id} handle={({ listeners }) => (
+                              <span {...listeners} aria-label="Drag row" tabIndex={0} className="flex items-center justify-center h-6 w-6 text-gray-400 hover:text-gray-600 focus:outline-none">
+                                <GripVertical className="h-4 w-4" />
+                              </span>
+                            )}>
+                              <td className="pl-6 pr-2 py-3">
+                                <Checkbox 
+                                  checked={selectedProducts.includes(product.id)}
+                                  onCheckedChange={() => toggleProductSelection(product.id)}
+                                  aria-label={`Select ${product.title}`}
                                 />
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0"
-                                  onClick={() => handleStockUpdate(product.id, editValue)}
+                              </td>
+                              <td className="px-10 py-3 whitespace-nowrap align-middle text-left">
+                                <div 
+                                  className="flex items-center cursor-pointer" 
+                                  onClick={() => handleEdit(product)}
                                 >
-                                  <Check className="h-3 w-3 text-green-600" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0"
-                                  onClick={() => setEditingId(null)}
-                                >
-                                  <X className="h-3 w-3 text-red-600" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <>
-                                <span className="font-medium">{product.quantity}</span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="ml-1 h-7 w-7 p-0"
-                                  onClick={() => {
-                                    setEditingId(product.id);
-                                    setEditValue(product.quantity?.toString() || "0");
+                                  <div className="relative h-10 w-10 mr-3">
+                                    <ProductImage 
+                                      url={product.images?.[0]?.url} 
+                                      alt={product.images?.[0]?.alt_text || `Product: ${product.title}`}
+                                    />
+                                  </div>
+                                  <div>
+                                    <div className="font-medium text-[14px] whitespace-nowrap">{product.title}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-10 py-3 text-[14px] font-normal align-middle whitespace-nowrap text-left" style={{ color: '#595959' }}>
+                                {product.description ? truncateText(product.description, 25) : "-"}
+                              </td>
+                              <td className="px-10 py-3 text-[14px] font-normal whitespace-nowrap text-left" style={{ color: '#030712' }}>
+                                {product.sku || "-"}
+                              </td>
+                              <td className="px-10 py-3 text-[14px] font-normal whitespace-nowrap text-right" style={{ color: '#030712' }}>
+                                {formatPrice(product.price)}
+                              </td>
+                              <td className="px-10 py-3 text-[14px] font-normal whitespace-nowrap text-right" style={{ color: '#030712' }}>
+                                <div className="flex items-center">
+                                  {editingId === product.id ? (
+                                    <div className="flex items-center gap-1">
+                                      <Input
+                                        type="number"
+                                        value={editValue}
+                                        onChange={(e) => setEditValue(e.target.value)}
+                                        className="w-16 h-7 text-xs"
+                                        autoFocus
+                                      />
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-7 w-7 p-0"
+                                        onClick={() => handleStockUpdate(product.id, editValue)}
+                                      >
+                                        <Check className="h-3 w-3 text-green-600" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-7 w-7 p-0"
+                                        onClick={() => setEditingId(null)}
+                                      >
+                                        <X className="h-3 w-3 text-red-600" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <span className="font-medium">{product.quantity}</span>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="ml-1 h-7 w-7 p-0"
+                                        onClick={() => {
+                                          setEditingId(product.id);
+                                          setEditValue(product.quantity?.toString() || "0");
+                                        }}
+                                      >
+                                        <Pencil className="h-3 w-3 text-gray-400" />
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-10 py-3">
+                                <Badge className={statusInfo.color + ' rounded-lg pointer-events-none font-normal border'}
+                                  style={{
+                                    cursor: 'default',
+                                    borderColor:
+                                      statusInfo.color.includes('green') ? 'rgba(21, 128, 61, 0.2)' : // green-700
+                                      statusInfo.color.includes('red') ? 'rgba(185, 28, 28, 0.2)' :   // red-700
+                                      statusInfo.color.includes('yellow') ? 'rgba(161, 98, 7, 0.2)' : // yellow-700
+                                      statusInfo.color.includes('blue') ? 'rgba(30, 64, 175, 0.2)' :   // blue-700
+                                      statusInfo.color.includes('gray') ? 'rgba(55, 65, 81, 0.08)' :   // gray-700, even lighter
+                                      'rgba(209, 213, 219, 0.2)', // fallback gray-300
+                                    borderWidth: 1,
+                                    borderStyle: 'solid',
+                                    opacity: 1
                                   }}
+                                  onMouseEnter={e => { e.currentTarget.style.borderColor = e.currentTarget.style.borderColor; e.currentTarget.style.opacity = '1'; }}
+                                  onMouseLeave={e => { e.currentTarget.style.borderColor = e.currentTarget.style.borderColor; e.currentTarget.style.opacity = '1'; }}
+                                  data-border-opacity="0.2"
                                 >
-                                  <Pencil className="h-3 w-3 text-gray-400" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge className={statusInfo.color}>
-                            {statusInfo.label}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEdit(product)}>
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              
-                              {product.status !== 'active' ? (
-                                <DropdownMenuItem onClick={async () => {
-                                  try {
-                                    const { error } = await supabase
-                                      .from('products')
-                                      .update({ status: 'active' })
-                                      .eq('id', product.id);
+                                  {statusInfo.label}
+                                </Badge>
+                              </td>
+                              <td className="px-10 py-3 text-[14px] font-normal whitespace-nowrap align-middle text-left" style={{ color: stockStatus === 'Low' ? '#b91c1c' : '#15803d' }}>
+                                {stockStatus}
+                              </td>
+                              <td className="px-10 py-3 text-[14px] font-normal whitespace-nowrap text-left" style={{ color: '#030712' }}>
+                                {(product.collections ?? []).length > 0 ? (
+                                  <div className="flex gap-1 items-center">
+                                    {(product.collections ?? []).map((c: any, index: number) => (
+                                      <Fragment key={c.id}>
+                                        <span>{c.name}</span>
+                                        {index < (product.collections ?? []).length - 1 && <span className="text-gray-300">, </span>}
+                                      </Fragment>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400">Uncategorized</span>
+                                )}
+                              </td>
+                              <td className="px-10 py-3 text-right whitespace-nowrap align-middle">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 border-none focus:outline-none focus-visible:outline-none">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="font-waldenburg text-[12px]">
+                                    <DropdownMenuItem onClick={() => handleEdit(product)}>
+                                      <Pencil className="mr-2 h-4 w-4" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    
+                                    {product.status !== 'active' ? (
+                                      <DropdownMenuItem onClick={async () => {
+                                        try {
+                                          const { error } = await supabase
+                                            .from('products')
+                                            .update({ status: 'active' })
+                                            .eq('id', product.id);
+                                            
+                                          if (error) throw error;
+                                          setProducts(prev => prev.map(p => 
+                                            p.id === product.id ? {...p, status: 'active'} : p
+                                          ));
+                                          toast.success('Product published');
+                                        } catch (error) {
+                                          console.error('Error publishing product:', error);
+                                          toast.error('Failed to publish product');
+                                        }
+                                      }}>
+                                        <Check className="mr-2 h-4 w-4 text-green-600" />
+                                        Publish
+                                      </DropdownMenuItem>
+                                    ) : (
+                                      <DropdownMenuItem onClick={async () => {
+                                        try {
+                                          const { error } = await supabase
+                                            .from('products')
+                                            .update({ status: 'draft' })
+                                            .eq('id', product.id);
+                                            
+                                          if (error) throw error;
+                                          setProducts(prev => prev.map(p => 
+                                            p.id === product.id ? {...p, status: 'draft'} : p
+                                          ));
+                                          toast.success('Product unpublished');
+                                        } catch (error) {
+                                          console.error('Error unpublishing product:', error);
+                                          toast.error('Failed to unpublish product');
+                                        }
+                                      }}>
+                                        <X className="mr-2 h-4 w-4 text-red-600" />
+                                        Unpublish
+                                      </DropdownMenuItem>
+                                    )}
+                                    
+                                    <DropdownMenuItem onClick={() => {
+                                      const duplicateProduct: DuplicateProduct = {
+                                        ...product,
+                                        title: `${product.title} (Copy)`,
+                                        sku: product.sku ? `${product.sku}-COPY` : null,
+                                      };
                                       
-                                    if (error) throw error;
-                                    setProducts(prev => prev.map(p => 
-                                      p.id === product.id ? {...p, status: 'active'} : p
-                                    ));
-                                    toast.success('Product published');
-                                  } catch (error) {
-                                    console.error('Error publishing product:', error);
-                                    toast.error('Failed to publish product');
-                                  }
-                                }}>
-                                  <Check className="mr-2 h-4 w-4 text-green-600" />
-                                  Publish
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem onClick={async () => {
-                                  try {
-                                    const { error } = await supabase
-                                      .from('products')
-                                      .update({ status: 'draft' })
-                                      .eq('id', product.id);
+                                      delete duplicateProduct.id;
+                                      delete duplicateProduct.created_at;
+                                      delete duplicateProduct.updated_at;
+                                      delete duplicateProduct.images;
                                       
-                                    if (error) throw error;
-                                    setProducts(prev => prev.map(p => 
-                                      p.id === product.id ? {...p, status: 'draft'} : p
-                                    ));
-                                    toast.success('Product unpublished');
-                                  } catch (error) {
-                                    console.error('Error unpublishing product:', error);
-                                    toast.error('Failed to unpublish product');
-                                  }
-                                }}>
-                                  <X className="mr-2 h-4 w-4 text-red-600" />
-                                  Unpublish
-                                </DropdownMenuItem>
-                              )}
-                              
-                              <DropdownMenuItem onClick={() => {
-                                const duplicateProduct: DuplicateProduct = {
-                                  ...product,
-                                  title: `${product.title} (Copy)`,
-                                  sku: product.sku ? `${product.sku}-COPY` : null,
-                                };
-                                
-                                delete duplicateProduct.id;
-                                delete duplicateProduct.created_at;
-                                delete duplicateProduct.updated_at;
-                                delete duplicateProduct.images;
-                                
-                                supabase
-                                  .from('products')
-                                  .insert(duplicateProduct)
-                                  .select()
-                                  .then(({ data, error }) => {
-                                    if (error) {
-                                      toast.error(`Failed to duplicate: ${error.message}`);
-                                    } else if (data && data[0]) {
-                                      toast.success('Product duplicated');
-                                      
-                                      if (product.images && product.images.length > 0) {
-                                        const newProductId = data[0].id;
-                                        const imagesToInsert = product.images.map(img => ({
-                                          product_id: newProductId,
-                                          url: img.url,
-                                          alt_text: img.alt_text,
-                                          position: img.position
-                                        }));
-                                        
-                                        supabase
-                                          .from('product_images')
-                                          .insert(imagesToInsert)
-                                          .then(({ error: imgError }) => {
-                                            if (imgError) {
-                                              console.error('Error duplicating images:', imgError);
+                                      supabase
+                                        .from('products')
+                                        .insert(duplicateProduct)
+                                        .select()
+                                        .then(({ data, error }) => {
+                                          if (error) {
+                                            toast.error(`Failed to duplicate: ${error.message}`);
+                                          } else if (data && data[0]) {
+                                            toast.success('Product duplicated');
+                                            
+                                            if (product.images && product.images.length > 0) {
+                                              const newProductId = data[0].id;
+                                              const imagesToInsert = product.images.map(img => ({
+                                                product_id: newProductId,
+                                                url: img.url,
+                                                alt_text: img.alt_text,
+                                                position: img.position
+                                              }));
+                                              
+                                              supabase
+                                                .from('product_images')
+                                                .insert(imagesToInsert)
+                                                .then(({ error: imgError }) => {
+                                                  if (imgError) {
+                                                    console.error('Error duplicating images:', imgError);
+                                                  }
+                                                });
                                             }
-                                          });
-                                      }
-                                    }
-                                  });
-                              }}>
-                                <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                                </svg>
-                                Duplicate
-                              </DropdownMenuItem>
-                              
-                              <DropdownMenuItem onClick={() => window.open(`/products/${product.id}`, '_blank')}>
-                                <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                                  <circle cx="12" cy="12" r="3" />
-                                </svg>
-                                Store View
-                              </DropdownMenuItem>
-                              
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem 
-                                    className="text-red-600"
-                                    onSelect={(e) => e.preventDefault()}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This action cannot be undone. This will permanently delete the product.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction 
-                                      className="bg-red-600 hover:bg-red-700 text-white hover:text-white"
-                                      onClick={() => handleDeleteProduct(product.id)}
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <div className="max-w-md mx-auto">
-                <HelpCircle className="mx-auto h-10 w-10 text-gray-400" />
-                <h3 className="mt-4 text-lg font-medium text-gray-900">No products found</h3>
-                <p className="mt-2 text-sm text-gray-500">
-                  {searchQuery ? "No products match your search criteria." : "Get started by adding your first product."}
-                </p>
-                <div className="mt-6">
-                  <Link href="/admin/products/add">
-                    <Button>Add Product</Button>
-                  </Link>
+                                          }
+                                        });
+                                    }}>
+                                      <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                                        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                                      </svg>
+                                      Duplicate
+                                    </DropdownMenuItem>
+                                    
+                                    <DropdownMenuItem onClick={() => window.open(`/products/${product.id}`, '_blank')}>
+                                      <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                                        <circle cx="12" cy="12" r="3" />
+                                      </svg>
+                                      Store View
+                                    </DropdownMenuItem>
+                                    
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem 
+                                          className="text-red-600 focus:text-red-600 focus:bg-red-50 text-sm py-1"
+                                          onSelect={(e) => e.preventDefault()}
+                                        >
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          Delete
+                                        </DropdownMenuItem>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            This action cannot be undone. This will permanently delete the product.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                          <AlertDialogAction 
+                                            className="bg-red-600 hover:bg-red-700 text-white hover:text-white"
+                                            onClick={() => handleDeleteProduct(product.id)}
+                                          >
+                                            Delete
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </td>
+                            </DraggableRow>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </SortableContext>
+                </DndContext>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="max-w-md mx-auto">
+                  <HelpCircle className="mx-auto h-10 w-10 text-gray-400" />
+                  <h3 className="mt-4 text-lg font-medium text-gray-900">No products found</h3>
+                  <p className="mt-2 text-sm text-gray-500">
+                    {searchQuery ? "No products match your search criteria." : "Get started by adding your first product."}
+                  </p>
+                  <div className="mt-6">
+                    <Link href="/admin/products/add">
+                      <AdminButton variant="outline">Add Product</AdminButton>
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
+
+      {/* Pagination Controls */}
+      <div className="mt-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Select
+            value={pageSize.toString()}
+            onValueChange={(value) => {
+              setPageSize(Number(value));
+              setCurrentPage(1); // Reset to first page when changing page size
+            }}
+          >
+            <SelectTrigger className="h-9 w-[120px]">
+              <SelectValue>{pageSize} per page</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10 per page</SelectItem>
+              <SelectItem value="25">25 per page</SelectItem>
+              <SelectItem value="50">50 per page</SelectItem>
+              <SelectItem value="100">100 per page</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <div className="text-sm text-muted-foreground">
+            {totalProducts} total items
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-6 lg:space-x-8">
+          <div className="flex w-[100px] items-center justify-center text-sm font-medium">
+            Page {currentPage} of {Math.ceil(totalProducts / pageSize)}
+          </div>
+          <div className="flex items-center space-x-2">
+            <AdminButton
+              variant="outline"
+              size="sm"
+              className="h-9 px-4 py-2 rounded-md"
+              onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </AdminButton>
+            <AdminButton
+              variant="outline"
+              size="sm"
+              className="h-9 px-4 py-2 rounded-md"
+              onClick={() => setCurrentPage(page => Math.min(Math.ceil(totalProducts / pageSize), page + 1))}
+              disabled={currentPage === Math.ceil(totalProducts / pageSize)}
+            >
+              Next
+            </AdminButton>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

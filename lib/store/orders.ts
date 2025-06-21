@@ -145,7 +145,8 @@ export const useOrderStore = create<OrderStore>((set, get) => {
             order_id: order.id,
             product_id: item.product_id,
             quantity: item.quantity,
-            price: item.price
+            price: item.price,
+            status: 'active'
           }));
           
           const { error: itemsError } = await supabase

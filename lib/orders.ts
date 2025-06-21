@@ -99,7 +99,8 @@ export async function createOrder(orderData: CreateOrderInput) {
     quantity: item.quantity,
     price: item.price,
     total: item.price * item.quantity,
-    options: item.options
+    options: item.options,
+    status: 'active'
   }));
   
   const { error: itemsError } = await supabase

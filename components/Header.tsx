@@ -6,7 +6,7 @@ import { Search, Heart, ChevronDown } from 'lucide-react';
 import { CartSheet } from '@/components/cart/CartSheet';
 import { useCartStore } from '@/lib/store/cart';
 import { SearchInline } from '@/components/SearchInline';
-import { siteConfig } from "@/config/site";
+
 import { useSettingsStore } from "@/lib/store/settings";
 import { useWishlistStore } from "@/lib/store/wishlist";
 import { useEffect, useState } from "react";

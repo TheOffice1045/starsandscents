@@ -40,7 +40,7 @@ import {
   TrendingDown,
   ArrowUpRight,
 } from "lucide-react";
-import { Bar, BarChart, Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import { Bar, BarChart, Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { createBrowserClient } from '@supabase/ssr';
@@ -561,8 +561,8 @@ export default function AdminOverviewPage() {
             </Card>
           </div>
 
-          {/* Charts Section */}
-          <div className="grid gap-6 md:grid-cols-2">
+         {/* Charts Section */}
+         <div className="grid gap-6">
             {/* Bar Chart */}
             <Card>
               <CardHeader>
@@ -571,22 +571,69 @@ export default function AdminOverviewPage() {
               </CardHeader>
               <CardContent>
                 <ChartContainer config={salesChartConfig}>
-                  <BarChart accessibilityLayer data={salesChartData}>
-                    <CartesianGrid vertical={false} />
+                  <AreaChart
+                    accessibilityLayer
+                    data={salesChartData}
+                    margin={{
+                      top: 20,
+                      right: 20,
+                      bottom: 20,
+                      left: 20,
+                    }}
+                  >
+                    <defs>
+                      <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-revenue)" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="var(--color-revenue)" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="ordersGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-orders)" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="var(--color-orders)" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
                     <XAxis
                       dataKey="month"
                       tickLine={false}
-                      tickMargin={10}
                       axisLine={false}
+                      tickMargin={10}
                       tickFormatter={(value) => value.slice(0, 3)}
+                      stroke="#888"
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={10}
+                      stroke="#888"
+                      tick={false}
                     />
                     <ChartTooltip
-                      cursor={false}
-                      content={<ChartTooltipContent indicator="dashed" />}
+                      cursor={{
+                        stroke: "#666",
+                        strokeWidth: 1,
+                        strokeDasharray: "4 4"
+                      }}
+                      content={<ChartTooltipContent indicator="dot" />}
                     />
-                    <Bar dataKey="revenue" fill="var(--color-revenue)" radius={4} />
-                    <Bar dataKey="orders" fill="var(--color-orders)" radius={4} />
-                  </BarChart>
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="var(--color-revenue)"
+                      strokeWidth={2}
+                      fill="url(#revenueGradient)"
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 0 }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="orders"
+                      stroke="var(--color-orders)"
+                      strokeWidth={2}
+                      fill="url(#ordersGradient)"
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 0 }}
+                    />
+                  </AreaChart>
                 </ChartContainer>
               </CardContent>
               <CardFooter className="flex-col items-start gap-2 text-sm">
@@ -599,73 +646,6 @@ export default function AdminOverviewPage() {
                 </div>
                 <div className="leading-none text-muted-foreground">
                   Showing revenue and order count for the last 6 months
-                </div>
-              </CardFooter>
-            </Card>
-
-            {/* Area Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Orders by Device</CardTitle>
-                <CardDescription>
-                  Desktop vs Mobile orders
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer config={deviceChartConfig}>
-                  <AreaChart
-                    accessibilityLayer
-                    data={ordersByDeviceData}
-                    margin={{
-                      left: 12,
-                      right: 12,
-                    }}
-                  >
-                    <CartesianGrid vertical={false} />
-                    <XAxis
-                      dataKey="month"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      tickFormatter={(value) => value.slice(0, 3)}
-                    />
-                    <ChartTooltip
-                      cursor={false}
-                      content={<ChartTooltipContent indicator="dot" />}
-                    />
-                    <Area
-                      dataKey="mobile"
-                      type="natural"
-                      fill="var(--color-mobile)"
-                      fillOpacity={0.4}
-                      stroke="var(--color-mobile)"
-                      stackId="a"
-                    />
-                    <Area
-                      dataKey="desktop"
-                      type="natural"
-                      fill="var(--color-desktop)"
-                      fillOpacity={0.4}
-                      stroke="var(--color-desktop)"
-                      stackId="a"
-                    />
-                  </AreaChart>
-                </ChartContainer>
-              </CardContent>
-              <CardFooter>
-                <div className="flex w-full items-start gap-2 text-sm">
-                  <div className="grid gap-2">
-                    <div className="flex items-center gap-2 font-medium leading-none">
-                      {Math.random() > 0.5 ? (
-                        <>Mobile orders increasing by 3.8% <ArrowUpRight className="h-4 w-4 text-green-500" /></>
-                      ) : (
-                        <>Desktop remains primary platform <TrendingUp className="h-4 w-4 text-blue-500" /></>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 leading-none text-muted-foreground">
-                      Last 6 months data
-                    </div>
-                  </div>
                 </div>
               </CardFooter>
             </Card>

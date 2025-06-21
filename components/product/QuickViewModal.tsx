@@ -26,6 +26,7 @@ export function QuickViewModal({ product, isOpen, onClose }: QuickViewModalProps
       name: product.name || '',
       price: product.price || 0,
       image: product.image || '',
+      stock: product.quantity || 0,
     });
     onClose();
   };

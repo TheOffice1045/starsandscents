@@ -13,6 +13,7 @@ interface StoreAddress {
 
 interface StoreSettings {
   name: string;
+  slogan?: string;
   logo?: string;
   heroImage?: string;
   heroImageUrl?: string; // Add this field for the Supabase Storage URL
@@ -32,6 +33,7 @@ interface SettingsState {
     language: string;
     notifications: boolean;
     name: string;
+    slogan: string;
     logo: string;
     heroImage?: string;
     heroImageUrl?: string;
@@ -58,6 +60,7 @@ const createSettingsStore: StateCreator<SettingsState> = (set) => ({
     language: 'en',
     notifications: true,
     name: 'My Candle Store',
+    slogan: '',
     logo: '',
     timeZone: 'America/New_York',
     autoDST: true,
@@ -105,6 +108,7 @@ export const useSettingsStore = create<SettingsState>()(
 // Update the settings type to include review settings
 interface Settings {
   name: string;
+  slogan?: string;
   logo: string;
   heroImage?: string;
   heroImageUrl?: string;

@@ -33,6 +33,7 @@ interface SelectedProduct {
   price: number;
   quantity: number;
   variant?: string;
+  image_url?: string;
 }
 
 // Remove the problematic comment examples and replace with proper comments
@@ -73,9 +74,9 @@ export default function CreateOrderPage() {
   const filteredCustomers = customers.filter((customer) => {
     const query = customerSearchQuery.toLowerCase();
     return (
-      customer.name.toLowerCase().includes(query) ||
-      (customer.email && customer.email.toLowerCase().includes(query)) ||
-      (customer.phone && customer.phone.includes(query))
+      (customer.name?.toLowerCase() || "").includes(query) ||
+      (customer.email?.toLowerCase() || "").includes(query) ||
+      (customer.phone || "").includes(query)
     );
   });
   
@@ -95,13 +96,33 @@ export default function CreateOrderPage() {
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch products
+      const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setProducts(data || []);
+      if (productsError) throw productsError;
+
+      // Fetch all product images
+      const { data: imagesData, error: imagesError } = await supabase
+        .from('product_images')
+        .select('product_id, url, position')
+        .order('position', { ascending: true });
+
+      if (imagesError) throw imagesError;
+
+      // Attach first image to each product and map 'title' to 'name'
+      const productsWithImages = (productsData || []).map(product => {
+        const productImages = (imagesData || []).filter(img => img.product_id === product.id);
+        return {
+          ...product,
+          name: product.title, // Map title to name for compatibility
+          image_url: productImages.length > 0 ? productImages[0].url : undefined,
+        };
+      });
+
+      setProducts(productsWithImages);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast.error('Failed to fetch products');
@@ -147,8 +168,8 @@ export default function CreateOrderPage() {
   const filteredProducts = products.filter((product) => {
     const query = searchQuery.toLowerCase();
     return (
-      product.name.toLowerCase().includes(query) ||
-      product.sku.toLowerCase().includes(query)
+      (product.name?.toLowerCase() || "").includes(query) ||
+      (product.sku?.toLowerCase() || "").includes(query)
     );
   });
 
@@ -160,7 +181,8 @@ export default function CreateOrderPage() {
       .filter(p => !existingProductIds.includes(p.id))
       .map(p => ({
         ...p,
-        quantity: 1
+        quantity: 1,
+        image_url: p.image_url // Ensure image_url is included
       }));
     
     // Create a new array to ensure React detects the state change
@@ -223,6 +245,7 @@ export default function CreateOrderPage() {
         // Only include customer_id if a customer is actually selected
         ...(selectedCustomer?.id ? { customer_id: selectedCustomer.id } : {}),
         customer_name: selectedCustomer?.name || "Guest",
+        customer_email: selectedCustomer?.email || null,
         payment_status: "pending",
         fulfillment_status: "unfulfilled",
         notes: notes,
@@ -265,7 +288,9 @@ export default function CreateOrderPage() {
         product_name: product.name,
         quantity: product.quantity,
         price: product.price,
-        total: product.price * product.quantity
+        total: product.price * product.quantity,
+        image_url: product.image_url, // Include image_url for order details page
+        status: 'active'
       }));
       
       const { error: itemsError } = await supabase
@@ -390,7 +415,7 @@ export default function CreateOrderPage() {
                         <td className="py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center">
-                              <Image src="/placeholder.png" alt="" width={32} height={32} className="w-8 h-8" />
+                              <Image src={product.image_url || "/placeholder.png"} alt={product.name} width={32} height={32} className="w-8 h-8 object-cover" />
                             </div>
                             <div>
                               <div className="font-medium">{product.name}</div>
@@ -534,20 +559,18 @@ export default function CreateOrderPage() {
       </div>
 
       <Dialog open={isSearchModalOpen} onOpenChange={setIsSearchModalOpen}>
-        <DialogContent className="max-w-2xl p-0 max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-2xl p-0 max-h-[80vh] overflow-hidden flex flex-col font-waldenburg text-[13px]">
           <DialogHeader className="p-6 pb-0">
             <div className="flex justify-between items-center">
               {selectedView === "all-products" && (
                 <button
                   onClick={() => setSelectedView("main")}
-                  className="text-sm flex items-center text-gray-500 hover:text-gray-700"
+                  className="text-sm flex items-center text-gray-500 hover:text-gray-700 font-waldenburg"
                 >
                   ← Back
                 </button>
               )}
-              <DialogTitle className="text-xl">
-                {selectedView === "main" ? "Select products" : "All products"}
-              </DialogTitle>
+              <DialogTitle className="text-xl font-waldenburg font-semibold">{selectedView === "main" ? "Select products" : "All products"}</DialogTitle>
               <button
                 onClick={() => setIsSearchModalOpen(false)}
                 className="text-gray-400 hover:text-gray-500"
@@ -559,26 +582,26 @@ export default function CreateOrderPage() {
 
           <div className="p-6 overflow-y-auto flex-grow">
             <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                <Input 
-                  className="pl-10" 
-                  placeholder="Search products"
-                  value={searchQuery || ''} 
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <Input 
+                className="pl-10 font-waldenburg text-[13px]"
+                placeholder="Search products"
+                value={searchQuery || ''} 
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
 
             {selectedView === "main" ? (
               <div className="space-y-1">
                 <button
                   onClick={() => setSelectedView("all-products")}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between rounded-md"
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between rounded-md font-waldenburg"
                 >
                   <span>All products</span>
                   <ChevronRight className="h-4 w-4 text-gray-400" />
                 </button>
                 <button
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between rounded-md"
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between rounded-md font-waldenburg"
                 >
                   <span>Collections</span>
                   <ChevronRight className="h-4 w-4 text-gray-400" />
@@ -594,7 +617,7 @@ export default function CreateOrderPage() {
                   filteredProducts.map((product) => (
                     <div 
                       key={product.id}
-                      className="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer"
+                      className="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer font-waldenburg text-[13px]"
                       onClick={() => toggleProductSelection(product.id)}
                     >
                       <div className="flex items-center gap-3">
@@ -602,22 +625,29 @@ export default function CreateOrderPage() {
                           type="checkbox" 
                           className="rounded border-gray-300"
                           checked={selectedModalProducts.includes(product.id)}
-                          readOnly // Add this to prevent onChange during render
-                          onClick={(e) => { // Change from onChange to onClick
+                          readOnly
+                          onClick={(e) => {
                             e.stopPropagation();
                             toggleProductSelection(product.id);
                           }}
                         />
+                        <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
+                          {product.image_url ? (
+                            <Image src={product.image_url} alt={product.name} width={40} height={40} className="object-cover w-10 h-10" />
+                          ) : (
+                            <Image src="/placeholder.png" alt="" width={32} height={32} className="w-8 h-8" />
+                          )}
+                        </div>
                         <div>
-                          <h3 className="font-medium">{product.name}</h3>
-                          <p className="text-sm text-gray-500">{product.sku}</p>
+                          <h3 className="font-medium text-[15px] text-[#0a0a0a] font-waldenburg">{product.name}</h3>
+                          <p className="text-xs text-gray-500 font-waldenburg">{product.sku}</p>
                         </div>
                       </div>
-                      <span className="text-sm">${product.price.toFixed(2)}</span>
+                      <span className="text-[15px] font-waldenburg text-[#0a0a0a]">${product.price.toFixed(2)}</span>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-gray-500 font-waldenburg">
                     No products found
                   </div>
                 )}
@@ -626,23 +656,23 @@ export default function CreateOrderPage() {
           </div>
 
           <div className="border-t p-4 flex justify-between items-center mt-auto">
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-gray-500 font-waldenburg">
               {selectedModalProducts.length} selected
             </div>
-            <div className="space-x-2">
-              <Button variant="outline" onClick={() => {
+            <div className="space-x-2 flex">
+              <AdminButton variant="outline" onClick={() => {
                 setIsSearchModalOpen(false);
                 setSelectedModalProducts([]);
-              }}>
+              }} className="h-10 px-6 font-waldenburg text-[13px]">
                 Cancel
-              </Button>
-              <Button onClick={() => {
+              </AdminButton>
+              <AdminButton onClick={() => {
                 const productsToAdd = products.filter(p => selectedModalProducts.includes(p.id));
                 handleAddProducts(productsToAdd);
                 setSelectedModalProducts([]);
-              }}>
+              }} className="h-10 px-6 font-waldenburg text-[13px]">
                 Add
-              </Button>
+              </AdminButton>
             </div>
           </div>
         </DialogContent>

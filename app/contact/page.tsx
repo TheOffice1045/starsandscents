@@ -2,19 +2,44 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useEmail } from "@/lib/hooks/useEmail";
+import { useSiteConfig } from "@/hooks/useSiteConfig";
+import { toast } from "sonner";
 import Link from "next/link";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    subject: "",
     message: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const { sendContactForm, isLoading } = useEmail();
+  const siteConfig = useSiteConfig();
+  const storeName = siteConfig.name;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted:", formData);
-    setFormData({ name: "", email: "", message: "" });
+    
+    try {
+      const result = await sendContactForm(
+        formData.name,
+        formData.email,
+        formData.subject,
+        formData.message,
+        storeName
+      );
+
+      if (result.success) {
+        toast.success("Message sent successfully! We'll get back to you soon.");
+        setFormData({ name: "", email: "", subject: "", message: "" });
+      } else {
+        toast.error(result.error || "Failed to send message. Please try again.");
+      }
+    } catch (error) {
+      toast.error("An error occurred. Please try again later.");
+    }
   };
 
   return (
@@ -35,10 +60,9 @@ export default function ContactPage() {
         </div>
       </div>
 
-      {/* Existing Contact Content */}
+      {/* Contact Content */}
       <div className="container mx-auto px-4 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          {/* Rest of your existing contact page content remains unchanged */}
           <div>
             <h2 className="text-2xl font-semibold mb-4">Get in Touch</h2>
             <p className="text-muted-foreground mb-6">
@@ -72,6 +96,7 @@ export default function ContactPage() {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full rounded-md border border-input px-4 py-2"
                   required
+                  disabled={isLoading}
                 />
               </div>
               <div>
@@ -85,6 +110,22 @@ export default function ContactPage() {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full rounded-md border border-input px-4 py-2"
                   required
+                  disabled={isLoading}
+                />
+              </div>
+              <div>
+                <label htmlFor="subject" className="block font-medium mb-2">
+                  Subject
+                </label>
+                <input
+                  type="text"
+                  id="subject"
+                  value={formData.subject}
+                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                  className="w-full rounded-md border border-input px-4 py-2"
+                  required
+                  disabled={isLoading}
+                  placeholder="How can we help you?"
                 />
               </div>
               <div>
@@ -97,10 +138,12 @@ export default function ContactPage() {
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                   className="w-full rounded-md border border-input px-4 py-2 h-32"
                   required
+                  disabled={isLoading}
+                  placeholder="Tell us more about your inquiry..."
                 />
               </div>
-              <Button type="submit" className="w-full">
-                Send Message
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Sending..." : "Send Message"}
               </Button>
             </form>
           </div>

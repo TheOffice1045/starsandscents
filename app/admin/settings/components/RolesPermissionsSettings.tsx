@@ -72,41 +72,36 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch roles
-        const { data: rolesData, error: rolesError } = await supabase
-          .from('store_roles')
-          .select('*')
-          .eq('store_id', storeId);
-          
-        if (rolesError) throw rolesError;
+        // Fetch roles from API
+        const rolesResponse = await fetch(`/api/admin/roles?store_id=${storeId}`);
+        if (!rolesResponse.ok) throw new Error('Failed to fetch roles');
+        let rolesData = await rolesResponse.json();
         
         // Check if Owner role exists, if not create it
-        let ownerRoleExists = rolesData.some(role => role.name === 'Owner');
+        let ownerRoleExists = rolesData.some((role: any) => role.name === 'Owner');
         
         if (!ownerRoleExists) {
           // Get all available permissions
-          const { data: allPermissions } = await supabase
-            .from('permissions')
-            .select('id');
-            
-          const permissionIds = allPermissions ? allPermissions.map(p => p.id) : [];
+          const permissionsResponse = await fetch('/api/admin/permissions');
+          if (!permissionsResponse.ok) throw new Error('Failed to fetch permissions');
+          const allPermissions = await permissionsResponse.json();
+          
+          const permissionIds = Object.values(allPermissions).flat().map((p: any) => p.id);
           
           // Create Owner role with all permissions
-          const { data: ownerRole, error: createError } = await supabase
-            .from('store_roles')
-            .insert({
+          const createOwnerResponse = await fetch('/api/admin/roles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
               store_id: storeId,
               name: 'Owner',
               description: 'Full access and unrestricted permissions across the entire platform',
               permissions: permissionIds,
-            })
-            .select()
-            .single();
-            
-          if (createError) {
-            console.error('Error creating Owner role:', createError);
-          } else {
-            // Add the new Owner role to the data
+            }),
+          });
+          
+          if (createOwnerResponse.ok) {
+            const ownerRole = await createOwnerResponse.json();
             rolesData.push(ownerRole);
           }
         }
@@ -119,23 +114,20 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
           
         if (usersError) throw usersError;
         
-        // Fetch permissions
-        const { data: permissionsData, error: permissionsError } = await supabase
-          .from('permissions')
-          .select('*')
-          .order('category', { ascending: true });
-          
-        if (permissionsError) throw permissionsError;
+        // Fetch permissions from API
+        const permissionsResponse = await fetch('/api/admin/permissions');
+        if (!permissionsResponse.ok) throw new Error('Failed to fetch permissions');
+        const permissionsData = await permissionsResponse.json();
         
         // Format the data
-        const formattedRoles = rolesData.map((role) => ({
+        const formattedRoles = rolesData.map((role: any) => ({
           id: role.id,
           name: role.name,
           description: role.description,
           permissions: Array.isArray(role.permissions) ? role.permissions : [],
         }));
         
-        const formattedUsers = usersData.map((user) => ({
+        const formattedUsers = usersData.map((user: any) => ({
           id: user.user_id || user.id,
           email: user.email,
           role: user.role_id,
@@ -144,7 +136,9 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
           active: user.status === 'active',
         }));
         
-        const formattedPermissions = permissionsData.map((permission) => ({
+        // Flatten permissions data for easier use
+        const allPermissions = Object.values(permissionsData).flat();
+        const formattedPermissions = allPermissions.map((permission: any) => ({
           id: permission.id,
           name: permission.name,
           description: permission.description,
@@ -168,6 +162,25 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
     
     fetchData();
   }, [storeId, supabase, newUserRole]);
+
+  // Fetch roles when the invite dialog is opened
+  useEffect(() => {
+    if (!showInviteUserDialog || !storeId) return;
+    const fetchRoles = async () => {
+      try {
+        const { data: rolesData, error: rolesError } = await supabase
+          .from('store_roles')
+          .select('id, name, description, permissions')
+          .eq('store_id', storeId);
+        if (rolesError) throw rolesError;
+        setRoles(rolesData || []);
+      } catch (error) {
+        console.error('Error fetching roles:', error);
+        toast.error('Failed to load roles');
+      }
+    };
+    fetchRoles();
+  }, [showInviteUserDialog, storeId, supabase]);
 
   // Update the handleInviteUser function to ensure it properly uses the selected role
   const handleInviteUser = async () => {
@@ -243,12 +256,20 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
       : [...selectedRole.permissions, permissionId];
     
     try {
-      const { error } = await supabase
-        .from('store_roles')
-        .update({ permissions: updatedPermissions })
-        .eq('id', selectedRole.id);
-        
-      if (error) throw error;
+      const response = await fetch(`/api/admin/roles?id=${selectedRole.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: selectedRole.name,
+          description: selectedRole.description,
+          permissions: updatedPermissions,
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update permissions');
+      }
       
       // Update local state
       const updatedRole = { ...selectedRole, permissions: updatedPermissions };
@@ -286,21 +307,29 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
   };
 
   const handleAddRole = async () => {
-    if (!storeId || !newRoleName) return;
+    if (!storeId || !newRoleName.trim()) {
+      toast.error("Please enter a role name");
+      return;
+    }
     
     try {
-      const { data, error } = await supabase
-        .from('store_roles')
-        .insert({
+      const response = await fetch('/api/admin/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           store_id: storeId,
-          name: newRoleName,
-          description: newRoleDescription,
+          name: newRoleName.trim(),
+          description: newRoleDescription.trim() || '',
           permissions: [],
-        })
-        .select()
-        .single();
-        
-      if (error) throw error;
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to add role');
+      }
+      
+      const data = await response.json();
       
       const newRole = {
         id: data.id,
@@ -318,6 +347,37 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
     } catch (error: any) {
       console.error('Error adding role:', error);
       toast.error(`Failed to add role: ${error.message}`);
+    }
+  };
+
+  const handleDeleteRole = async (roleId: string, roleName: string) => {
+    if (!confirm(`Are you sure you want to delete the "${roleName}" role? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/admin/roles?id=${roleId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete role');
+      }
+      
+      // Remove role from local state
+      const updatedRoles = roles.filter(role => role.id !== roleId);
+      setRoles(updatedRoles);
+      
+      // If the deleted role was selected, select the first available role
+      if (selectedRole?.id === roleId) {
+        setSelectedRole(updatedRoles.length > 0 ? updatedRoles[0] : null);
+      }
+      
+      toast.success(`Role "${roleName}" deleted successfully`);
+    } catch (error: any) {
+      console.error('Error deleting role:', error);
+      toast.error(`Failed to delete role: ${error.message}`);
     }
   };
 
@@ -745,12 +805,12 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setShowAddRoleDialog(false)}>
+                  <AdminButton variant="outline" onClick={() => setShowAddRoleDialog(false)}>
                     Cancel
-                  </Button>
-                  <Button onClick={handleAddRole} disabled={!newRoleName}>
+                  </AdminButton>
+                  <AdminButton onClick={handleAddRole} disabled={!newRoleName}>
                     Create Role
-                  </Button>
+                  </AdminButton>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

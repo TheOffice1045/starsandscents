@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { User, Settings, LogOut, UserCircle, BoxesIcon, ClipboardList, ShoppingCart, FileCheck2, PackageCheck } from "lucide-react";
 import Link from "next/link";
-import { siteConfig } from "@/config/site";
+
 import { Bell } from "lucide-react";
 import {
   Popover,

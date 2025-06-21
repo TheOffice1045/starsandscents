@@ -66,6 +66,7 @@ export function ProductCard({ product }: ProductCardProps) {
       name: productName,
       price: productPrice,
       image: imageUrl,
+      stock: product.quantity || 0,
     };
     addItem(cartItem);
     toast.success('Added to Cart', {

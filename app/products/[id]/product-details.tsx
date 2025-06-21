@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Minus, Plus } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface ProductDetailsProps {
   product: {
@@ -16,6 +17,9 @@ interface ProductDetailsProps {
     oldPrice?: number | null;
     image: string;
     isNew?: boolean;
+    quantity: number;
+    title: string;
+    images?: string[];
   };
 }
 
@@ -140,10 +144,12 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
   const handleAddToCart = () => {
     addItem({
       id: product.id,
-      name: `${product.name} - ${selectedSize}`,
-      price: sizes.find(s => s.label === selectedSize)?.price || product.price,
-      image: product.image,
+      name: product.title,
+      price: product.price,
+      image: product.images?.[0] || '/placeholder.jpg',
+      stock: product.quantity
     });
+    toast.success('Added to cart');
   };
 
   return (
@@ -254,8 +260,22 @@ export default function ProductDetails({ product }: ProductDetailsProps) {
             className="w-full mb-6"
             size="lg"
             onClick={handleAddToCart}
+            disabled={product.quantity <= 0}
           >
-            ADD TO CART
+            {product.quantity <= 0 ? 'OUT OF STOCK' : 'ADD TO CART'}
+          </Button>
+
+          {/* Buy Now */}
+          <Button 
+            className="w-full bg-black hover:bg-gray-800 text-white hover:text-white"
+            onClick={() => {
+              handleAddToCart();
+              // Navigate to checkout page
+              window.location.href = "/checkout";
+            }}
+            disabled={product.quantity <= 0}
+          >
+            {product.quantity <= 0 ? 'OUT OF STOCK' : 'Buy Now'}
           </Button>
 
           {/* Features */}

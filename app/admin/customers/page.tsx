@@ -252,15 +252,7 @@ export default function CustomersPage() {
         <div className="space-y-1">
           <h1 className="text-xl font-medium">Customers</h1>
         </div>
-        <div className="flex gap-2">
-          <AdminButton variant="outline" size="sm" onClick={handleExport}>
-            <Upload className="w-4 h-4 mr-2" />
-            Export
-          </AdminButton>
-          <AdminButton variant="outline" size="sm" onClick={() => setIsImportOpen(true)}>
-            <Download className="w-4 h-4 mr-2" />
-            Import
-          </AdminButton>
+        <div>
           <Link href="/admin/customers/new">
             <AdminButton size="sm">
               <Plus className="mr-2 h-4 w-4" />
@@ -294,148 +286,155 @@ export default function CustomersPage() {
             />
           </svg>
         </div>
-        <div className="relative" ref={filterRef}>
-          <AdminButton 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-          >
-            <Filter className="w-4 h-4 mr-2" />
-            Column Filter
+        <div className="flex items-center gap-2">
+          <div className="relative" ref={filterRef}>
+            <AdminButton 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Column Filter
+            </AdminButton>
+            {isFilterOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white border rounded-md shadow-lg z-30 p-3">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-medium text-sm">Show/Hide Columns</h3>
+                  <button 
+                    onClick={() => setIsFilterOpen(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="col-name" 
+                      checked={visibleColumns.name} 
+                      disabled={true}
+                    />
+                    <label htmlFor="col-name" className="text-sm font-medium">Customer name</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="col-email" 
+                      checked={visibleColumns.email} 
+                      disabled={true}
+                    />
+                    <label htmlFor="col-email" className="text-sm font-medium">Email</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="col-emailSubscription" 
+                      checked={visibleColumns.emailSubscription} 
+                      disabled={true}
+                    />
+                    <label htmlFor="col-emailSubscription" className="text-sm font-medium">Email subscription</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="col-location" 
+                      checked={visibleColumns.location} 
+                      onCheckedChange={() => toggleColumn('location')}
+                    />
+                    <label htmlFor="col-location" className="text-sm font-medium">Location</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="col-orders" 
+                      checked={visibleColumns.orders} 
+                      disabled={true}
+                    />
+                    <label htmlFor="col-orders" className="text-sm font-medium">Orders</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="col-amountSpent" 
+                      checked={visibleColumns.amountSpent} 
+                      onCheckedChange={() => toggleColumn('amountSpent')}
+                    />
+                    <label htmlFor="col-amountSpent" className="text-sm font-medium">Amount spent</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="col-phone" 
+                      checked={visibleColumns.phone} 
+                      onCheckedChange={() => toggleColumn('phone')}
+                    />
+                    <label htmlFor="col-phone" className="text-sm font-medium">Phone</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="col-address" 
+                      checked={visibleColumns.address} 
+                      onCheckedChange={() => toggleColumn('address')}
+                    />
+                    <label htmlFor="col-address" className="text-sm font-medium">Address</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="col-dateJoined" 
+                      checked={visibleColumns.dateJoined} 
+                      disabled={true}
+                    />
+                    <label htmlFor="col-dateJoined" className="text-sm font-medium">Date joined</label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="col-lastUpdated" 
+                      checked={visibleColumns.lastUpdated} 
+                      disabled={true}
+                    />
+                    <label htmlFor="col-lastUpdated" className="text-sm font-medium">Last updated</label>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <AdminButton variant="outline" size="sm" onClick={handleExport}>
+            <Upload className="w-4 h-4 mr-2" />
+            Export
           </AdminButton>
-          
-          {isFilterOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-white border rounded-md shadow-lg z-30 p-3">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-medium text-sm">Show/Hide Columns</h3>
-                <button 
-                  onClick={() => setIsFilterOpen(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="col-name" 
-                    checked={visibleColumns.name} 
-                    disabled={true}
-                  />
-                  <label htmlFor="col-name" className="text-sm font-medium">Customer name</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="col-email" 
-                    checked={visibleColumns.email} 
-                    disabled={true}
-                  />
-                  <label htmlFor="col-email" className="text-sm font-medium">Email</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="col-emailSubscription" 
-                    checked={visibleColumns.emailSubscription} 
-                    disabled={true}
-                  />
-                  <label htmlFor="col-emailSubscription" className="text-sm font-medium">Email subscription</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="col-location" 
-                    checked={visibleColumns.location} 
-                    onCheckedChange={() => toggleColumn('location')}
-                  />
-                  <label htmlFor="col-location" className="text-sm font-medium">Location</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="col-orders" 
-                    checked={visibleColumns.orders} 
-                    disabled={true}
-                  />
-                  <label htmlFor="col-orders" className="text-sm font-medium">Orders</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="col-amountSpent" 
-                    checked={visibleColumns.amountSpent} 
-                    onCheckedChange={() => toggleColumn('amountSpent')}
-                  />
-                  <label htmlFor="col-amountSpent" className="text-sm font-medium">Amount spent</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="col-phone" 
-                    checked={visibleColumns.phone} 
-                    onCheckedChange={() => toggleColumn('phone')}
-                  />
-                  <label htmlFor="col-phone" className="text-sm font-medium">Phone</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="col-address" 
-                    checked={visibleColumns.address} 
-                    onCheckedChange={() => toggleColumn('address')}
-                  />
-                  <label htmlFor="col-address" className="text-sm font-medium">Address</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="col-dateJoined" 
-                    checked={visibleColumns.dateJoined} 
-                    disabled={true}
-                  />
-                  <label htmlFor="col-dateJoined" className="text-sm font-medium">Date joined</label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="col-lastUpdated" 
-                    checked={visibleColumns.lastUpdated} 
-                    disabled={true}
-                  />
-                  <label htmlFor="col-lastUpdated" className="text-sm font-medium">Last updated</label>
-                </div>
-              </div>
-            </div>
-          )}
+          <AdminButton variant="outline" size="sm" onClick={() => setIsImportOpen(true)}>
+            <Download className="w-4 h-4 mr-2" />
+            Import
+          </AdminButton>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border overflow-hidden">
+      <div className="bg-white rounded-xl border admin-table overflow-x-auto">
         <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <table className="w-full min-w-[900px] table-fixed">
-            <thead>
-              <tr className="border-b">
-                <th className="w-12 p-4 sticky left-0 bg-white z-20">
+          <table className="w-full min-w-[900px] table-fixed admin-table text-[13px] font-normal" style={{ fontFamily: "'Waldenburg', system-ui, sans-serif" }}>
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b bg-gray-50">
+                <th className="w-12 px-4 py-3 sticky left-0 z-20 bg-gray-50">
                   <Checkbox 
                     checked={selectedCustomers.length === customers.length && customers.length > 0}
                     onCheckedChange={handleSelectAll}
                   />
                 </th>
-                <th className="text-left p-4 font-medium text-sm sticky left-12 bg-white z-20 w-[200px]">
-                  Customer name
-                </th>
-                <th className="text-left p-4 font-medium text-sm w-[250px]">Email</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700 sticky left-12 z-20 w-[200px] bg-gray-50">Customer name</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700 w-[250px] bg-gray-50">Email</th>
                 {visibleColumns.emailSubscription && (
-                  <th className="text-left p-4 font-medium text-sm w-[160px]">Email subscription</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-700 w-[160px] bg-gray-50">Email subscription</th>
                 )}
                 {visibleColumns.location && (
-                  <th className="text-left p-4 font-medium text-sm w-[140px]">Location</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-700 w-[140px] bg-gray-50">Location</th>
                 )}
-                <th className="text-left p-4 font-medium text-sm w-[120px]">Orders</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700 w-[120px] bg-gray-50">Orders</th>
                 {visibleColumns.amountSpent && (
-                  <th className="text-right p-4 font-medium text-sm w-[140px]">Amount spent</th>
+                  <th className="text-right px-4 py-3 font-semibold text-gray-700 w-[140px] bg-gray-50">Amount spent</th>
                 )}
                 {visibleColumns.phone && (
-                  <th className="text-left p-4 font-medium text-sm w-[140px]">Phone</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-700 w-[140px] bg-gray-50">Phone</th>
                 )}
                 {visibleColumns.address && (
-                  <th className="text-left p-4 font-medium text-sm w-[200px]">Address</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-700 w-[200px] bg-gray-50">Address</th>
                 )}
-                <th className="text-left p-4 font-medium text-sm w-[140px]">Date joined</th>
-                <th className="text-left p-4 font-medium text-sm w-[140px]">Last updated</th>
-                <th className="text-center p-4 font-medium text-sm w-[80px] sticky right-0 bg-white z-20">Actions</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700 w-[140px] bg-gray-50">Date joined</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700 w-[140px] bg-gray-50">Last updated</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700 w-[80px] sticky right-0 z-20 bg-gray-50">Actions</th>
               </tr>
             </thead>
             <tbody>
