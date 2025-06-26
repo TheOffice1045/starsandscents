@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MoreHorizontal, Loader2, CheckCircle, Truck, CreditCard, FileText, MapPin, Mail, Phone, User, Calendar, Package, DollarSign, ExternalLink } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, Loader2, CheckCircle, Truck, CreditCard, FileText, MapPin, Mail, Phone, User, Calendar, Package, DollarSign, ExternalLink, Copy } from "lucide-react";
 import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
 import Image from "next/image";
@@ -19,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { useRouter } from "next/navigation";
 
 interface Order {
   id: string;
@@ -40,6 +41,7 @@ interface Order {
 
 export default function OrderDetailsPage({ params }: { params: { id: string } }) {
   const id = params.id;
+  const router = useRouter();
   
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -562,10 +564,12 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
                   </AdminButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Edit Order
-                  </DropdownMenuItem>
+                  {order.fulfillment_status !== 'fulfilled' && (
+                    <DropdownMenuItem onClick={() => router.push(`/admin/orders/${id}/edit`)}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      Edit Order
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem>
                     <DollarSign className="mr-2 h-4 w-4" />
                     Refund
@@ -776,9 +780,9 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
             <CardHeader className="pb-2 pt-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Notes</CardTitle>
-                <Button variant="ghost" size="icon" className="h-7 w-7">
-                  <FileText className="h-3.5 w-3.5" />
-                  <span className="sr-only">Edit notes</span>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { const notesText = order?.notes || "No notes from customer"; try { await navigator.clipboard.writeText(notesText); toast.success("Notes copied to clipboard"); } catch (err) { const textArea = document.createElement("textarea"); textArea.value = notesText; document.body.appendChild(textArea); textArea.select(); try { document.execCommand("copy"); toast.success("Notes copied to clipboard"); } catch (fallbackErr) { toast.error("Failed to copy notes"); } document.body.removeChild(textArea); } }}>
+                  <Copy className="h-3.5 w-3.5" />
+                  <span className="sr-only">Copy notes</span>
                 </Button>
               </div>
             </CardHeader>

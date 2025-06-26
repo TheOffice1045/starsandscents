@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Search, ChevronRight, X } from "lucide-react";
+import { ArrowLeft, Search, ChevronRight, X, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import {
   Dialog,
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { FormLabel } from "@/components/ui/form";
 import Image from "next/image";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface SelectedProduct {
   id: number;
@@ -69,6 +70,10 @@ export default function CreateOrderPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedView, setSelectedView] = useState<"main" | "all-products">("main");
   const [notes, setNotes] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [customerCurrentPage, setCustomerCurrentPage] = useState(1);
+  const [customerPageSize, setCustomerPageSize] = useState(5);
   
   // Add this function to filter customers based on search query
   const filteredCustomers = customers.filter((customer) => {
@@ -79,6 +84,11 @@ export default function CreateOrderPage() {
       (customer.phone || "").includes(query)
     );
   });
+  
+  const paginatedCustomers = filteredCustomers.slice(
+    (customerCurrentPage - 1) * customerPageSize,
+    customerCurrentPage * customerPageSize
+  );
   
   // Replace hardcoded products with state that will be populated from database
   const [products, setProducts] = useState<Array<{
@@ -172,6 +182,11 @@ export default function CreateOrderPage() {
       (product.sku?.toLowerCase() || "").includes(query)
     );
   });
+
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   const handleAddProducts = (productsToAdd: typeof filteredProducts) => {
     // First check if any products are already selected to avoid duplicates
@@ -559,120 +574,110 @@ export default function CreateOrderPage() {
       </div>
 
       <Dialog open={isSearchModalOpen} onOpenChange={setIsSearchModalOpen}>
-        <DialogContent className="max-w-2xl p-0 max-h-[80vh] overflow-hidden flex flex-col font-waldenburg text-[13px]">
-          <DialogHeader className="p-6 pb-0">
-            <div className="flex justify-between items-center">
-              {selectedView === "all-products" && (
-                <button
-                  onClick={() => setSelectedView("main")}
-                  className="text-sm flex items-center text-gray-500 hover:text-gray-700 font-waldenburg"
-                >
-                  ← Back
-                </button>
-              )}
-              <DialogTitle className="text-xl font-waldenburg font-semibold">{selectedView === "main" ? "Select products" : "All products"}</DialogTitle>
-              <button
-                onClick={() => setIsSearchModalOpen(false)}
-                className="text-gray-400 hover:text-gray-500"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-          </DialogHeader>
-
-          <div className="p-6 overflow-y-auto flex-grow">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <Input 
-                className="pl-10 font-waldenburg text-[13px]"
-                placeholder="Search products"
-                value={searchQuery || ''} 
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            {selectedView === "main" ? (
-              <div className="space-y-1">
-                <button
-                  onClick={() => setSelectedView("all-products")}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between rounded-md font-waldenburg"
-                >
-                  <span>All products</span>
-                  <ChevronRight className="h-4 w-4 text-gray-400" />
-                </button>
-                <button
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between rounded-md font-waldenburg"
-                >
-                  <span>Collections</span>
-                  <ChevronRight className="h-4 w-4 text-gray-400" />
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {isLoading ? (
-                  <div className="flex justify-center items-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-800"></div>
-                  </div>
-                ) : filteredProducts.length > 0 ? (
-                  filteredProducts.map((product) => (
-                    <div 
-                      key={product.id}
-                      className="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer font-waldenburg text-[13px]"
-                      onClick={() => toggleProductSelection(product.id)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <input 
-                          type="checkbox" 
-                          className="rounded border-gray-300"
-                          checked={selectedModalProducts.includes(product.id)}
-                          readOnly
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleProductSelection(product.id);
-                          }}
-                        />
-                        <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
-                          {product.image_url ? (
-                            <Image src={product.image_url} alt={product.name} width={40} height={40} className="object-cover w-10 h-10" />
-                          ) : (
-                            <Image src="/placeholder.png" alt="" width={32} height={32} className="w-8 h-8" />
-                          )}
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-[15px] text-[#0a0a0a] font-waldenburg">{product.name}</h3>
-                          <p className="text-xs text-gray-500 font-waldenburg">{product.sku}</p>
-                        </div>
-                      </div>
-                      <span className="text-[15px] font-waldenburg text-[#0a0a0a]">${product.price.toFixed(2)}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-gray-500 font-waldenburg">
-                    No products found
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="border-t p-4 flex justify-between items-center mt-auto">
-            <div className="text-sm text-gray-500 font-waldenburg">
-              {selectedModalProducts.length} selected
-            </div>
-            <div className="space-x-2 flex">
-              <AdminButton variant="outline" onClick={() => {
-                setIsSearchModalOpen(false);
-                setSelectedModalProducts([]);
-              }} className="h-10 px-6 font-waldenburg text-[13px]">
-                Cancel
+        <DialogContent className="max-w-3xl p-0">
+          <div className="flex flex-col h-[70vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <AdminButton variant="ghost" size="sm" onClick={() => setIsSearchModalOpen(false)}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
               </AdminButton>
-              <AdminButton onClick={() => {
-                const productsToAdd = products.filter(p => selectedModalProducts.includes(p.id));
-                handleAddProducts(productsToAdd);
-                setSelectedModalProducts([]);
-              }} className="h-10 px-6 font-waldenburg text-[13px]">
-                Add
+              <h2 className="text-md font-medium font-waldenburg">All products</h2>
+              <AdminButton variant="ghost" size="icon" onClick={() => setIsSearchModalOpen(false)}>
+                <X className="h-4 w-4" />
               </AdminButton>
+            </div>
+
+            {/* Search */}
+            <div className="p-4 border-b">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search products"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            {/* Product List */}
+            <div className="flex-1 overflow-y-auto">
+              {paginatedProducts.map((product, index) => (
+                <div
+                  key={product.id}
+                  className="flex items-center gap-4 p-4 border-b border-gray-100 font-waldenburg"
+                >
+                  <Checkbox
+                    checked={selectedModalProducts.includes(product.id)}
+                    onCheckedChange={() => toggleProductSelection(product.id)}
+                  />
+                  <div className="w-10 h-10 flex-shrink-0">
+                    <Image
+                      src={product.image_url || "/placeholder.png"}
+                      alt={product.name}
+                      width={40}
+                      height={40}
+                      className="rounded-lg object-cover w-full h-full"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{product.name}</div>
+                    <div className="text-sm text-gray-500">{product.sku}</div>
+                  </div>
+                  <div className="font-waldenburg text-sm">${product.price.toFixed(2)}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="grid grid-cols-3 items-center p-6 border-t bg-white">
+              {/* Left: Pagination */}
+              <div className="flex items-center gap-4 justify-self-start">
+                <span className="text-sm text-gray-600">
+                  Page {currentPage} of {Math.ceil(filteredProducts.length / pageSize) || 1}
+                </span>
+                <div className="flex items-center gap-2">
+                  <AdminButton
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </AdminButton>
+                  <AdminButton
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredProducts.length / pageSize), p + 1))}
+                    disabled={currentPage === Math.ceil(filteredProducts.length / pageSize)}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </AdminButton>
+                </div>
+              </div>
+
+              {/* Middle: Selected Count */}
+              <div className="justify-self-center font-medium text-sm font-waldenburg text-gray-500">
+                {selectedModalProducts.length} selected
+              </div>
+              
+              {/* Right: Action Buttons */}
+              <div className="flex gap-4 justify-self-end">
+                <AdminButton size="sm" variant="outline" onClick={() => setIsSearchModalOpen(false)} className="text-xs">
+                  Cancel
+                </AdminButton>
+                <AdminButton
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => handleAddProducts(
+                    products.filter(p => selectedModalProducts.includes(p.id))
+                  )}
+                  
+                >
+                  Add
+                </AdminButton>
+              </div>
             </div>
           </div>
         </DialogContent>
@@ -680,10 +685,10 @@ export default function CreateOrderPage() {
     
     {/* Add this at the end of the component, after the product search dialog */}
           <Dialog open={isCustomerModalOpen} onOpenChange={setIsCustomerModalOpen}>
-            <DialogContent className="max-w-2xl p-0 max-h-[80vh] overflow-hidden flex flex-col">
-              <DialogHeader className="p-6 pb-0">
+            <DialogContent className="max-w-2xl p-0 font-waldenburg">
+              <DialogHeader className="p-6 pb-4">
                 <div className="flex justify-between items-center">
-                  <DialogTitle className="text-xl">Select customer</DialogTitle>
+                  <DialogTitle className="text-xl font-medium">Select customer</DialogTitle>
                   <button
                     onClick={() => setIsCustomerModalOpen(false)}
                     className="text-gray-400 hover:text-gray-500"
@@ -693,64 +698,66 @@ export default function CreateOrderPage() {
                 </div>
               </DialogHeader>
     
-              <div className="p-6 overflow-y-auto flex-grow">
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <div className="px-6 pb-6">
+                <div className="relative mb-6">
+                  <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                   <Input 
-                    className="pl-10" 
+                    className="pl-10 h-11" 
                     placeholder="Search customers"
                     value={customerSearchQuery} 
                     onChange={(e) => setCustomerSearchQuery(e.target.value)}
                   />
                 </div>
     
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {isLoadingCustomers ? (
                     <div className="flex justify-center items-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-800"></div>
                     </div>
-                  ) : filteredCustomers.length > 0 ? (
-                    filteredCustomers.map((customer) => (
+                  ) : paginatedCustomers.length > 0 ? (
+                    paginatedCustomers.map((customer, index) => (
                       <div 
                         key={customer.id}
-                        className="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer rounded-md"
+                        className={`p-4 cursor-pointer rounded-lg ${
+                          index === 2 ? 'bg-gray-100' : 'hover:bg-gray-50'
+                        }`}
                         onClick={() => handleSelectCustomer(customer)}
                       >
-                        <div className="flex items-center gap-3">
-                          <div>
-                            <h3 className="font-medium">{customer.name}</h3>
-                            {customer.email && <p className="text-sm text-gray-500">{customer.email}</p>}
-                            {customer.phone && <p className="text-sm text-gray-500">{customer.phone}</p>}
-                          </div>
-                        </div>
+                        <div className="font-medium text-sm">{customer.email || customer.name}</div>
+                        {customer.phone && <p className="text-sm text-gray-500">{customer.phone}</p>}
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-gray-500 text-sm">
                       No customers found
                     </div>
                   )}
                 </div>
               </div>
-    
-              <div className="border-t p-4 flex justify-between items-center mt-auto">
-                <div className="text-sm text-gray-500">
-                  {/* Placeholder for potential future functionality */}
-                </div>
-                <div className="space-x-2">
-                  <Button variant="outline" onClick={() => {
-                    setIsCustomerModalOpen(false);
-                    setCustomerSearchQuery("");
-                  }}>
-                    Cancel
-                  </Button>
-                  <Button onClick={() => {
-                    setIsCustomerModalOpen(false);
-                    // If we want to add "create new customer" functionality in the future
-                  }}>
-                    Create new customer
-                  </Button>
-                </div>
+              <div className="flex items-center justify-center p-4 border-t font-waldenburg">
+                 <div className="flex items-center gap-4">
+                    <span className="text-sm text-gray-600">
+                      Page {customerCurrentPage} of {Math.ceil(filteredCustomers.length / customerPageSize) || 1}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <AdminButton
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setCustomerCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={customerCurrentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </AdminButton>
+                      <AdminButton
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setCustomerCurrentPage(p => Math.min(Math.ceil(filteredCustomers.length / customerPageSize), p + 1))}
+                        disabled={customerCurrentPage === Math.ceil(filteredCustomers.length / customerPageSize)}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </AdminButton>
+                    </div>
+                  </div>
               </div>
             </DialogContent>
           </Dialog>

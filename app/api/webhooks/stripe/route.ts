@@ -16,18 +16,31 @@ const supabase = createClient(
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
+export async function GET() {
+  return NextResponse.json({ 
+    message: 'Stripe webhook endpoint is accessible',
+    timestamp: new Date().toISOString()
+  });
+}
+
 export async function POST(req: NextRequest) {
-  console.log('Received webhook request');
+  console.log('=== WEBHOOK RECEIVED ===');
+  console.log('Timestamp:', new Date().toISOString());
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
   
   try {
   const body = await req.text();
   const signature = req.headers.get('stripe-signature') as string;
+  
+  console.log('Body length:', body.length);
+  console.log('Signature present:', !!signature);
   
   let event: Stripe.Event;
   
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
       console.log('Webhook event type:', event.type);
+      console.log('Event ID:', event.id);
   } catch (error: any) {
     console.error(`Webhook signature verification failed: ${error.message}`);
     return NextResponse.json({ error: error.message }, { status: 400 });
@@ -105,6 +118,7 @@ export async function POST(req: NextRequest) {
           customer_email: expandedSession.customer_details?.email,
           customer_name: expandedSession.customer_details?.name,
           payment_status: expandedSession.payment_status,
+          status: expandedSession.payment_status === 'paid' ? 'paid' : 'pending_payment',
           fulfillment_status: 'unfulfilled',
           total: expandedSession.amount_total ? expandedSession.amount_total / 100 : 0,
           subtotal: expandedSession.amount_subtotal ? expandedSession.amount_subtotal / 100 : 0,
@@ -112,6 +126,7 @@ export async function POST(req: NextRequest) {
           shipping: expandedSession.total_details?.amount_shipping ? expandedSession.total_details.amount_shipping / 100 : 0,
           discount: discountAmount > 0 ? discountAmount : (expandedSession.total_details?.amount_discount ? expandedSession.total_details.amount_discount / 100 : 0),
           is_open: true,
+          payment_intent_id: session.payment_intent,
           notes: `Stripe Checkout Session ID: ${session.id}`
         };
         

@@ -690,14 +690,10 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
                         <TableCell>
                           <Select
                             value={user.role}
-                            onValueChange={(value) => handleChangeUserRole(user.id, user.email, value)}
+                            onValueChange={(newRoleId) => handleChangeUserRole(user.id, user.email, newRoleId)}
                           >
-                            <SelectTrigger className="w-[140px] h-8">
-                              <SelectValue>
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100">
-                                  {user.role_name}
-                                </span>
-                              </SelectValue>
+                            <SelectTrigger className="w-[180px] bg-transparent">
+                              <SelectValue placeholder="Select role" />
                             </SelectTrigger>
                             <SelectContent>
                               {roles.map((role) => (

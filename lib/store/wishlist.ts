@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { createBrowserClient } from '@supabase/ssr';
 import type { WishlistItem } from '../types/wishlist';
+import { toast } from "sonner";
 
 export interface WishlistStore {
   items: WishlistItem[];
@@ -108,34 +109,41 @@ export const useWishlistStore = create<WishlistState>()(
       },
       
       syncWithDatabase: async (customerId) => {
+        if (get().isInitialized) return; // Avoid multiple syncs
+
         const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
         
         try {
-          // Fetch wishlist items from database
-          const { data: wishlistData, error: wishlistError } = await supabase
+          const { data: wishlistItems, error } = await supabase
             .from('wishlist')
-            .select('*')
-            .eq('user_id', customerId);
-            
-          if (wishlistError) {
-            console.error('Error fetching wishlist:', wishlistError);
+            .select('products(*, product_images(url))')
+            .eq('customer_id', customerId);
+
+          if (error) {
+            console.error('Error fetching wishlist from database:', error);
+            toast.error("Could not load your wishlist. Please try again later.");
+            set({ isInitialized: true }); // Mark as initialized to prevent retries
             return;
           }
-          
-          if (wishlistData) {
-            // Transform data to match WishlistItem structure
-            const items: WishlistItem[] = wishlistData.map((item) => ({
-              id: item.id,
-              name: item.name,
-              price: item.price,
-              image: item.image,
-            }));
-            
-            // Update local state
-            set({ items, isInitialized: true });
-          }
+
+          const items: WishlistItem[] = wishlistItems
+            .map((item) => {
+              const product = Array.isArray(item.products) ? item.products[0] : item.products;
+              if (!product) return null;
+              
+              return {
+                id: product.id,
+                name: product.title,
+                price: product.price,
+                image: product.product_images?.[0]?.url || '/placeholder.png',
+              };
+            })
+            .filter((item): item is WishlistItem => item !== null);
+
+          set({ items, isInitialized: true });
         } catch (error) {
           console.error('Error syncing wishlist with database:', error);
+          set({ isInitialized: true }); // Ensure we don't get stuck in a loading loop
         }
       }
     }),

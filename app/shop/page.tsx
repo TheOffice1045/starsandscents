@@ -206,7 +206,7 @@ export default function ShopPage() {
           <div className="flex items-center gap-2">
             <button 
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-1 text-sm font-medium px-4 py-2 rounded-md bg-[#4A332F] text-white hover:bg-[#3a2824] transition-colors"
+              className="flex items-center gap-1 text-sm font-medium px-4 py-2 rounded-md bg-none text-[#4A332F] hover:bg-none transition-colors"
             >
               <Filter className="h-4 w-4" />
               {showFilters ? "Hide Filters" : "Show Filters"}

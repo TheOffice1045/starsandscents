@@ -98,7 +98,7 @@ export default function CollectionsPage() {
   const [loading, setLoading] = useState(true);
   const [collectionOrder, setCollectionOrder] = useState<string[]>([]);
   
-  const { collections, setCollections, addCollection, updateCollection, deleteCollection, toggleStatus: storeToggleStatus } = useCollectionStore();
+  const { collections, setCollections, addCollection, updateCollection, deleteCollection, fetchCollections, toggleStatus: storeToggleStatus } = useCollectionStore();
   const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
   // Fetch collections from database on component mount
@@ -200,11 +200,12 @@ export default function CollectionsPage() {
           
         // Add to local state with the returned ID
         if (data && data[0]) {
-          addCollection({
+          await addCollection({
             name: values.name,
             description: values.description,
             status: values.status
           });
+          await fetchCollections();
           toast.success('Collection created successfully');
         }
       }
@@ -229,7 +230,9 @@ export default function CollectionsPage() {
       if (error) throw error;
         
       // Remove from local state
-      deleteCollection(id);
+      await deleteCollection(id);
+      // Refresh from DB
+      await fetchCollections();
       toast.success('Collection deleted successfully');
     } catch (err) {
       console.error('Error deleting collection:', err);
@@ -504,7 +507,7 @@ export default function CollectionsPage() {
                                       <AlertDialogFooter>
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                                         <AlertDialogAction
-                                          onClick={() => deleteCollection(collection.id)}
+                                          onClick={() => handleDeleteCollection(collection.id)}
                                           className="bg-red-500 hover:bg-red-600"
                                         >
                                           Delete
@@ -561,7 +564,7 @@ export default function CollectionsPage() {
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                          onClick={() => deleteCollection(collection.id)}
+                          onClick={() => handleDeleteCollection(collection.id)}
                           className="bg-red-500 hover:bg-red-600"
                         >
                           Delete

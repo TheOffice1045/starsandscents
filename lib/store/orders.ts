@@ -72,7 +72,7 @@ export const useOrderStore = create<OrderStore>((set, get) => {
             *,
             items:order_items(*)
           `)
-          .order('order_date', { ascending: false });
+          .order('created_at', { ascending: false });
         
         if (error) throw error;
         

@@ -28,7 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Loader2, Plus, Trash2, Upload, X } from "lucide-react";
 import Link from "next/link";
-import { formatPrice, validateProduct } from "@/lib/utils";
+import { formatPrice, validateProduct, generateSKU } from "@/lib/utils";
 import Image from 'next/image';
 import { Switch } from "@/components/ui/switch";
 
@@ -244,43 +244,44 @@ export default function AddProductPage() {
     }
   };
 
-  const handleSubmit = async (status: string) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
-    
-    try {
-      const productData = {
-        ...product,
-        status,
-        quantity: inStock ? product.quantity : 0,
-      };
 
-      const validation = validateProduct(productData);
+    try {
+      // If SKU is empty, generate one
+      let sku = product.sku;
+      if (!sku || sku.trim() === "") {
+        sku = generateSKU(product.title);
+      }
+      // Validate product data
+      const validation = validateProduct({ ...product, sku });
       if (!validation.valid) {
-        toast.error(validation.errors.join(', '));
+        toast.error(validation.errors[0]);
         setLoading(false);
         return;
       }
 
-      // 1. Create the product without images
+      // Create product
       const { data: newProduct, error: productError } = await supabase
         .from('products')
         .insert({
-          title: productData.title,
-          description: productData.description,
-          price: productData.price,
-          compare_at_price: productData.compare_at_price,
-          cost_per_item: productData.cost_per_item,
-          sku: productData.sku,
-          barcode: productData.barcode,
-          quantity: productData.quantity,
-          weight: productData.weight,
-          weight_unit: productData.weight_unit,
-          status: productData.status,
-          vendor: productData.vendor,
-          tags: productData.tags,
-          seo_title: productData.seo_title,
-          seo_description: productData.seo_description,
-          collection_id: productData.collection_id,
+          title: product.title,
+          description: product.description,
+          price: product.price,
+          compare_at_price: product.compare_at_price,
+          cost_per_item: product.cost_per_item,
+          sku: sku,
+          barcode: product.barcode,
+          quantity: product.quantity,
+          weight: product.weight,
+          weight_unit: product.weight_unit,
+          status: product.status,
+          vendor: product.vendor,
+          tags: product.tags,
+          seo_title: product.seo_title,
+          seo_description: product.seo_description,
+          collection_id: product.collection_id,
           taxable: chargeTax,
           track_quantity: true,
           online_store: true,
@@ -348,13 +349,13 @@ export default function AddProductPage() {
           </AdminButton>
           <AdminButton 
             variant="outline"
-            onClick={() => handleSubmit('draft')}
+            onClick={(e) => handleSubmit(e)}
             disabled={loading}
           >
             Save Draft
           </AdminButton>
           <AdminButton 
-            onClick={() => handleSubmit('active')}
+            onClick={(e) => handleSubmit(e)}
             disabled={loading}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

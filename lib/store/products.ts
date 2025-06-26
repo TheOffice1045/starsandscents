@@ -321,9 +321,8 @@ export const useProductStore = create<ProductStore>()(
               
               const { addNotification } = useNotificationStore.getState();
               addNotification({
-                title: "Success",
-                message: `${product.title} has been added successfully.`,
-                type: "success"
+                title: "Product Added",
+                message: `A new product "${product.title}" has been added.`
               });
               
               return data;
@@ -346,7 +345,6 @@ export const useProductStore = create<ProductStore>()(
             addNotification({
               title: "Error",
               message: errorMessage,
-              type: "error"
             });
             
             set({ loading: false });
@@ -411,9 +409,8 @@ export const useProductStore = create<ProductStore>()(
 
             const { addNotification } = useNotificationStore.getState();
             addNotification({
-              title: "Success",
-              message: "Product updated successfully",
-              type: "success"
+              title: "Product Updated",
+              message: "Product has been updated successfully"
             });
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "Failed to update product";
@@ -422,7 +419,6 @@ export const useProductStore = create<ProductStore>()(
             addNotification({
               title: "Error",
               message: errorMessage,
-              type: "error"
             });
             set({ loading: false });
           }
@@ -445,7 +441,6 @@ export const useProductStore = create<ProductStore>()(
             addNotification({
               title: "Product Deleted",
               message: "Product has been deleted successfully.",
-              type: "warning"
             });
           } catch (error) {
             console.error('Error deleting product:', error);
@@ -453,7 +448,6 @@ export const useProductStore = create<ProductStore>()(
             addNotification({
               title: "Error",
               message: "Failed to delete product",
-              type: "error"
             });
             throw error;
           }

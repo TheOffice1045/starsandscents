@@ -20,16 +20,26 @@ import { toast } from "sonner";
 import { AdminEllipsisMenu } from '@/components/admin/AdminEllipsisMenu';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 
 
 // Update the order tabs to include "Fulfilled"
 const orderTabs = [
  "All Orders",
- "Open",
  "Unfulfilled",
  "Fulfilled", // Added Fulfilled tab
  "Unpaid",
- "Paid Orders",
+ "Paid",
 ] as const;
 
 
@@ -73,6 +83,8 @@ export default function OrdersPage() {
  });
  const [currentPage, setCurrentPage] = useState(1);
  const [pageSize, setPageSize] = useState(10);
+ const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+ const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
 
 
  // First, let's calculate the totals for each category in the fetchOrders function
@@ -237,15 +249,13 @@ export default function OrdersPage() {
 
 
    switch (activeTab) {
-     case "Open":
-       return order.is_open;
      case "Unfulfilled":
        return order.fulfillment_status === "unfulfilled";
      case "Fulfilled":
        return order.fulfillment_status === "fulfilled";
      case "Unpaid":
        return order.payment_status !== "paid";
-     case "Paid Orders":
+     case "Paid":
        return order.payment_status === "paid";
      default:
        return true;
@@ -259,10 +269,6 @@ export default function OrdersPage() {
 
 
  const handleDeleteOrder = async (orderId: string) => {
-   if (!confirm('Are you sure you want to delete this order?')) {
-     return;
-   }
-   
    try {
      const { error } = await supabase
        .from('orders')
@@ -367,12 +373,14 @@ export default function OrdersPage() {
    { key: 'actions', label: 'Actions', width: '100px', align: 'right', render: (row: Order) => (
      <AdminEllipsisMenu>
        <DropdownMenuItem onClick={() => router.push(`/admin/orders/${row.id}`)}>
-         View
+         Fulfill
        </DropdownMenuItem>
-       <DropdownMenuItem onClick={() => handleEditOrder(row.id)}>
-         Edit
-       </DropdownMenuItem>
-       <DropdownMenuItem onClick={() => handleDeleteOrder(row.id)} className="text-red-600">
+       {row.fulfillment_status !== 'fulfilled' && (
+         <DropdownMenuItem onClick={() => handleEditOrder(row.id)}>
+           Edit
+         </DropdownMenuItem>
+       )}
+       <DropdownMenuItem onClick={() => openDeleteDialog(row.id)} className="text-red-600">
          Delete
        </DropdownMenuItem>
      </AdminEllipsisMenu>
@@ -383,6 +391,21 @@ export default function OrdersPage() {
  // Calculate paginated orders
  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
  const paginatedOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+
+ const openDeleteDialog = (orderId: string) => {
+   setOrderToDelete(orderId);
+   setDeleteDialogOpen(true);
+ };
+ const closeDeleteDialog = () => {
+   setDeleteDialogOpen(false);
+ };
+ const confirmDeleteOrder = async () => {
+   if (orderToDelete) {
+     await handleDeleteOrder(orderToDelete);
+     closeDeleteDialog();
+   }
+ };
 
 
  return (
@@ -431,7 +454,7 @@ export default function OrdersPage() {
            bgColor: "bg-green-50"
          },
          {
-           label: "Pending Payments",
+           label: "Pending",
            value: filteredStats.pending.toString(),
            amount: filteredStats.pendingAmount || 0,
            icon: Banknote,
@@ -468,9 +491,9 @@ export default function OrdersPage() {
              <div className="flex flex-col items-end">
                <p className="text-sm font-medium text-gray-700">${stat.amount.toFixed(2)}</p>
                <p className="text-xs text-gray-500">
-                 {stat.label === "Total Orders" ? "Total Value" :
+                 {stat.label === "Total Orders" ? "Total Orders" :
                   stat.label === "Paid" ? "Total Paid" :
-                  stat.label === "Pending Payments" ? "Total Pending" :
+                  stat.label === "Pending" ? "Total Pending" :
                   stat.label === "Fulfilled" ? "Total Fulfilled" :
                   stat.label === "Unfulfilled" ? "Total Unfulfilled" :
                   "Total Value"}
@@ -604,12 +627,14 @@ export default function OrdersPage() {
                  <td className="py-3 px-10 text-left align-middle">
                    <AdminEllipsisMenu>
                      <DropdownMenuItem onClick={() => router.push(`/admin/orders/${order.id}`)}>
-                       View
+                       Fulfill
                      </DropdownMenuItem>
-                     <DropdownMenuItem onClick={() => handleEditOrder(order.id)}>
-                       Edit
-                     </DropdownMenuItem>
-                     <DropdownMenuItem onClick={() => handleDeleteOrder(order.id)} className="text-red-600">
+                     {order.fulfillment_status !== 'fulfilled' && (
+                       <DropdownMenuItem onClick={() => handleEditOrder(order.id)}>
+                         Edit
+                       </DropdownMenuItem>
+                     )}
+                     <DropdownMenuItem onClick={() => openDeleteDialog(order.id)} className="text-red-600">
                        Delete
                      </DropdownMenuItem>
                    </AdminEllipsisMenu>
@@ -690,6 +715,28 @@ export default function OrdersPage() {
          </div>
        </div>
      </div>
+
+     <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
+       setDeleteDialogOpen(open);
+       if (!open) setOrderToDelete(null);
+     }}>
+       <AlertDialogContent>
+         <AlertDialogHeader>
+           <AlertDialogTitle>Delete Order</AlertDialogTitle>
+           <AlertDialogDescription>
+             Are you sure you want to delete this order? This action cannot be undone.
+           </AlertDialogDescription>
+         </AlertDialogHeader>
+         <AlertDialogFooter>
+           <AdminButton variant="outline" onClick={closeDeleteDialog}>
+             Cancel
+           </AdminButton>
+           <AdminButton variant="destructive" onClick={confirmDeleteOrder}>
+             Delete
+           </AdminButton>
+         </AlertDialogFooter>
+       </AlertDialogContent>
+     </AlertDialog>
    </div>
  );
 }

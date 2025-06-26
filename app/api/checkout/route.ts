@@ -30,6 +30,19 @@ export async function POST(req: Request) {
       );
     }
 
+    // Get the logged-in user's email if available
+    let customerEmail = null;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      customerEmail = user?.email || null;
+    } catch (e) {
+      // Ignore if not logged in
+    }
+    // Fallback to email provided in the request body (if you collect it in your checkout form)
+    if (!customerEmail && body.email) {
+      customerEmail = body.email;
+    }
+
     // Verify stock levels for all items
     for (const item of items) {
       const { data: product } = await supabase
@@ -99,6 +112,11 @@ export async function POST(req: Request) {
         order_id: `order-${Date.now()}`,
       },
     };
+
+    // Set the customer_email for Stripe session
+    if (customerEmail) {
+      sessionData.customer_email = customerEmail;
+    }
 
     // Add coupon information to metadata if present
     if (coupon && coupon.discount_amount) {

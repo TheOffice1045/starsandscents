@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Pencil, Trash, Plus, Copy, Eye, Files } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash, Plus, Copy, Eye, EyeOff, Files } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -387,6 +387,11 @@ export default function DiscountsPage() {
                               !discount.is_active
                             )}
                           >
+                            {discount.is_active ? (
+                              <EyeOff className="mr-2 h-4 w-4" />
+                            ) : (
+                              <Eye className="mr-2 h-4 w-4" />
+                            )}
                             {discount.is_active ? 'Deactivate' : 'Activate'}
                           </DropdownMenuItem>
                           <DropdownMenuItem 

@@ -27,12 +27,16 @@ import { useSettingsStore } from "@/lib/store/settings";
 import Image from 'next/image';
 
 export function AdminHeader({ className = "" }: { className?: string }) {
-  const { notifications, markAsRead, markAllAsRead } = useNotificationStore();
+  const { notifications, fetchNotifications, markAsRead, markAllAsRead } = useNotificationStore();
   const { settings } = useSettingsStore();
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  React.useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
   return (
-    <header className={`bg-white px-6 py-3 flex items-center justify-between ${className}`}>
+    <header className={`bg-white px-6 py-3 flex items-center justify-between border-b ${className}`}>
       <Link href="/admin" className="h-8 flex items-center gap-3">
         <div className="relative h-8 w-32">
           <Image
@@ -57,45 +61,94 @@ export function AdminHeader({ className = "" }: { className?: string }) {
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-80">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-medium">Notifications</h3>
-              {unreadCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs"
-                  onClick={markAllAsRead}
-                >
-                  Mark all as read
-                </Button>
-              )}
+          <PopoverContent align="end" className="w-96 p-0 shadow-xl border-0 rounded-xl overflow-hidden">
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-4 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-white border border-gray-200 rounded-lg flex items-center justify-center">
+                    <Bell className="w-4 h-4 text-gray-800" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+                    
+                  </div>
+                </div>
+                {unreadCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-3 text-xs bg-white/70 hover:bg-white border border-gray-300 text-gray-700 hover:text-gray-900 rounded-lg"
+                    onClick={markAllAsRead}
+                  >
+                    Mark all read
+                  </Button>
+                )}
+              </div>
             </div>
-            <ScrollArea className="h-[300px]">
+            <ScrollArea className="h-[400px] bg-white">
               {notifications.length > 0 ? (
-                <div className="space-y-2">
+                <div className="divide-y divide-gray-100">
                   {notifications.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`p-3 rounded-lg text-sm ${
-                        !notification.read ? 'bg-gray-50' : ''
+                      className={`px-4 py-4 hover:bg-gray-50/80 transition-all duration-200 cursor-pointer group ${
+                        !notification.read ? 'bg-gradient-to-r from-gray-50/50 to-transparent border-l-4 border-l-gray-600' : ''
                       }`}
                       onClick={() => markAsRead(notification.id)}
                     >
-                      <div className="font-medium">{notification.title}</div>
-                      <p className="text-gray-500">{notification.message}</p>
-                      <div className="text-xs text-gray-400 mt-1">
-                        {formatDistanceToNow(notification.createdAt, { addSuffix: true })}
+                      <div className="flex items-start gap-3">
+                        <div className={`w-3 h-3 rounded-full mt-2 flex-shrink-0 transition-all duration-200 ${
+                          !notification.read 
+                            ? 'bg-gradient-to-r from-gray-600 to-gray-700 shadow-sm' 
+                            : 'bg-gray-300 group-hover:bg-gray-400'
+                        }`} />
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-xs font-semibold transition-colors ${
+                            !notification.read ? 'text-gray-900' : 'text-gray-700'
+                          }`}>
+                            {notification.title}
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1.5 leading-relaxed line-clamp-2">
+                            {notification.message}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <div className="flex items-center gap-1 text-xs text-gray-400">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                            </div>
+                            {!notification.read && (
+                              <div className="w-2 h-2 bg-gray-600 rounded-full animate-pulse" />
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center text-gray-500 py-8">
-                  No notifications
+                <div className="flex flex-col items-center justify-center py-16 px-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-4">
+                    <Bell className="w-8 h-8 text-gray-500" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900 mb-2">No notifications</p>
+                  <p className="text-xs text-gray-500 text-center max-w-48">
+                    You&apos;re all caught up! New notifications will appear here.
+                  </p>
                 </div>
               )}
             </ScrollArea>
+            {notifications.length > 0 && (
+              <div className="border-t border-gray-200 bg-gray-50/50 px-4 py-1">
+                <Link 
+                  href="/admin/notifications" 
+                  className="flex items-center justify-center w-full text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors py-2 rounded-lg hover:bg-gray-0"
+                >
+                  View all notifications
+                </Link>
+              </div>
+            )}
           </PopoverContent>
         </Popover>
 

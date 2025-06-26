@@ -20,16 +20,20 @@ export function formatPrice(price: number | string | null | undefined): string {
 
 // Generate a random SKU
 export function generateSKU(productName: string): string {
-  const prefix = productName
+  let prefix = productName
     .split(' ')
     .map(word => word[0])
     .join('')
     .toUpperCase()
     .substring(0, 3);
-    
+
+  // Pad prefix to always be 3 characters
+  while (prefix.length < 3) {
+    prefix += 'X';
+  }
+
   const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-  
-  return `${prefix}-${randomNum}`;
+  return `${prefix}${randomNum}`;
 }
 
 // Truncate text with ellipsis
@@ -174,4 +178,8 @@ export function getInventoryStatus(quantity: number): { label: string; color: st
   } else {
     return { label: 'In Stock', color: 'bg-green-100 text-green-800' };
   }
+}
+
+export function logError(...args: any[]) {
+  console.error(...args);
 }

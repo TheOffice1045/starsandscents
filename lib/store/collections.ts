@@ -53,7 +53,7 @@ export const useCollectionStore = create<CollectionStore>()(
               name: collection.name,
               description: collection.description,
               productCount: 0, // Will be updated by refreshProductCounts
-              status: collection.status === 'active' ? 'Active' : 'Inactive',
+              status: collection.is_featured ? 'Active' : 'Inactive',
               slug: collection.slug
             }));
             

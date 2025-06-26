@@ -114,7 +114,6 @@ function OrderStepper({ status }: { status: string }) {
             </span>
           ))}
         </div>
-        <Badge className={`ml-4 ${badgeColors[currentIdx]}`}>{ORDER_STEPS[currentIdx].label}</Badge>
       </div>
       <div className="w-full">
         <div className="relative h-0.5 w-full bg-gray-200 rounded-full overflow-hidden mt-2">
@@ -139,31 +138,31 @@ export default function OrdersTab({ user }: { user: any }) {
   const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
   const fetchOrders = useCallback(async () => {
-    if (!user?.email) return;
-    setLoading(true);
+      if (!user?.email) return;
+      setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('orders')
+        const { data, error } = await supabase
+          .from('orders')
         .select('*, order_items:order_items(*)')
         .eq('customer_email', user.email)
-        .not('status', 'eq', 'draft')
-        .not('status', 'eq', 'cart')
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('Error fetching orders:', error);
+          .not('status', 'eq', 'draft')
+          .not('status', 'eq', 'cart')
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          console.error('Error fetching orders:', error);
         toast.error('Failed to load orders');
         return;
       }
 
       console.log('Fetched orders:', data);
-      setOrders(data || []);
+          setOrders(data || []);
     } catch (error) {
       console.error('Error fetching orders:', error);
       toast.error('Failed to load orders');
     } finally {
-    setLoading(false);
-  }
+      setLoading(false);
+    }
   }, [user, supabase]);
 
   useEffect(() => {
@@ -332,159 +331,156 @@ export default function OrdersTab({ user }: { user: any }) {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>My Orders</CardTitle>
-          <CardDescription>Your purchase history</CardDescription>
-        </CardHeader>
-        <CardContent>
           <div className="space-y-8">
-            {orders.map((order) => {
-              const currentStep = getOrderStep(order.payment_status);
-              const currentIdx = ORDER_STEPS.findIndex(s => s.key === currentStep);
-              return (
-                <div key={order.id} className="rounded-xl border bg-white/80 shadow-sm p-6 space-y-4">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Calendar className="h-4 w-4" />
-                        <span>Placed {formatDate(order.created_at)}</span>
-                        <span>•</span>
-                        <span>Order <span className="font-semibold">#{order.order_number || order.id.substring(0, 8)}</span></span>
-                        <span>•</span>
-                        <span>Total: <span className="font-semibold">${order.total?.toFixed(2) || '0.00'}</span></span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2 md:mt-0">
-                      <Badge className={`${badgeColors[currentIdx]}`}>{ORDER_STEPS[currentIdx].label}</Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="icon" className="h-8 w-8 border-none shadow-none">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => { setSelectedOrder(order); setShowDetails(true); }}>
-                            <Package className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDownloadInvoice(order)}>
-                            <FileText className="mr-2 h-4 w-4" />
-                            Download Invoice
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleReorder(order)}>
-                            <RefreshCw className="mr-2 h-4 w-4" />
-                            Reorder
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleSupport(order)}>
-                            <Mail className="mr-2 h-4 w-4" />
-                            Contact Support
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleTrack(order)}>
-                            <Truck className="mr-2 h-4 w-4" />
-                            Track Shipment
-                          </DropdownMenuItem>
-                          {order.status !== 'cancelled' && isOrderCancellable(order.created_at) && (
-                            <DropdownMenuItem onClick={() => handleCancelOrder(order.id)} className="text-red-600">
-                              <X className="mr-2 h-4 w-4" />
-                              Cancel Order
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                    {order.order_items?.map((item: any, index: number) => {
-                      const isItemCancellable = order.status !== 'cancelled' && isOrderCancellable(order.created_at) && (item.status === undefined || item.status === null || item.status === 'active');
-                      return (
-                        <div key={`${order.id}-item-${index}`} className={`flex gap-4 items-center ${item.status === 'cancelled' ? 'opacity-60' : ''}`}>
-                          <div className="relative h-16 w-16 min-w-[4rem]">
-                            <ProductImage
-                              url={item.image_url || item.product_image || '/placeholder.png'}
-                              alt={item.product_name || item.name}
-                              className="object-cover rounded-md h-16 w-16"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="font-medium text-sm">{item.product_name || item.name}</h4>
-                            {item.variant_name && (
-                              <p className="text-xs text-muted-foreground">{item.variant_name}</p>
-                            )}
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-sm">${(item.price || item.unit_price || 0).toFixed(2)}</span>
-                              <span className="text-xs text-muted-foreground">× {item.quantity}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-end gap-2 min-w-[100px]">
-                            <p className="font-medium">${((item.price || item.unit_price || 0) * item.quantity).toFixed(2)}</p>
-                            {item.status === 'cancelled' ? (
-                              <span className="text-xs text-red-500 font-semibold ml-2">Cancelled</span>
-                            ) : (
-                              isItemCancellable && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="px-2 py-0 h-6 text-xs font-normal"
-                                  disabled={cancellingItemId === item.id}
-                                  onClick={() => handleCancelItem(order.id, item.id)}
-                                >
-                                  {cancellingItemId === item.id ? 'Cancelling...' : 'Cancel'}
-                                </Button>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {showTrackingMessageFor === order.id && (
-                    <div className="mt-2 flex items-center gap-3 rounded-md border bg-gray-50 p-3">
-                      <Info className="h-5 w-5 flex-shrink-0 text-gray-500" />
-                      <p className="text-sm text-gray-700">Tracking not available for this order.</p>
-                    </div>
-                  )}
+      <div>
+        <h1 className="text-2xl font-semibold">My Orders</h1>
+        <p className="text-muted-foreground mt-1">Your purchase history</p>
+      </div>
+
+      {orders.map((order) => {
+        const getStatusText = (status: string) => {
+          switch (status?.toLowerCase()) {
+            case 'paid':
+              return 'Paid';
+            case 'pending':
+            case 'awaiting_payment':
+            case 'pending_payment':
+              return 'Awaiting Payment';
+            case 'processing':
+              return 'Processing';
+            case 'fulfilled':
+            case 'shipped':
+              return 'Shipped';
+            case 'completed':
+            case 'delivered':
+              return 'Delivered';
+            case 'cancelled':
+              return 'Cancelled';
+            case 'refunded':
+              return 'Refunded';
+            default:
+              return 'Awaiting Payment';
+          }
+        };
+
+        return (
+          <div key={order.id} className="rounded-lg border bg-card text-card-foreground shadow-sm">
+            <div className="p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span>
+                    Order placed on {format(new Date(order.created_at), "MMMM d, yyyy")}
+                  </span>
                 </div>
-              );
-            })}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  <span>Order #{order.order_number || order.id.substring(0, 8)}</span>
+                  <span className="text-gray-300">·</span>
+                  <span>Total: ${order.total?.toFixed(2) || '0.00'}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={getStatusBadge(order.status)}>
+                  {getStatusText(order.status)}
+                </Badge>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => { setSelectedOrder(order); setShowDetails(true); }}>
+                      <Package className="mr-2 h-4 w-4" /> View Details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDownloadInvoice(order)}>
+                      <FileText className="mr-2 h-4 w-4" /> Download Invoice
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleTrack(order)}>
+                      <Truck className="mr-2 h-4 w-4" /> Track Shipment
+                    </DropdownMenuItem>
+                    {order.status !== 'cancelled' && isOrderCancellable(order.created_at) && (
+                      <>
+                        <Separator />
+                        <DropdownMenuItem onClick={() => handleCancelOrder(order.id)} className="text-red-600 focus:text-red-500 focus:bg-red-50">
+                          <X className="mr-2 h-4 w-4" /> Cancel Order
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            <div className="p-6 pt-0">
+              <div className="divide-y divide-gray-200 bg-[#f9fafb] p-6 rounded-md">
+                {order.order_items?.map((item: any) => (
+                  <div key={item.id} className={`flex items-start gap-4 py-4 first:pt-0 last:pb-0 ${item.status === 'cancelled' ? 'opacity-50' : ''}`}>
+                    <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border">
+                      <ProductImage
+                        url={item.image_url || item.product_image || '/placeholder.png'}
+                        alt={item.product_name || item.name}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{item.product_name || item.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ${(item.price || item.unit_price || 0).toFixed(2)} × {item.quantity}
+                      </p>
+                      {item.status === 'cancelled' && (
+                        <p className="text-xs text-red-500 font-semibold mt-1">Cancelled</p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-sm">${((item.price || item.unit_price || 0) * item.quantity).toFixed(2)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {showTrackingMessageFor === order.id && (
+              <div className="p-6 pt-0">
+                <div className="flex items-center gap-3 rounded-md border bg-muted p-3">
+                  <Info className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Tracking information is not yet available for this order.</p>
+                </div>
+              </div>
+            )}
           </div>
-        </CardContent>
-      </Card>
+        );
+      })}
 
       {/* Order Details Modal */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Order Details</DialogTitle>
-            <DialogDescription>Full details for your order.</DialogDescription>
-          </DialogHeader>
           {selectedOrder && (
-            <div className="space-y-4">
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
+            <>
+              <DialogHeader>
+                <DialogTitle>Order #{selectedOrder.order_number || selectedOrder.id.substring(0, 8)}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6 pt-4">
+                <div className="flex items-center justify-between border-b pb-4">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="h-4 w-4" />
-                    <span>Placed {formatDate(selectedOrder.created_at)}</span>
-                    <span>•</span>
-                    <span>Order <span className="font-medium">#{selectedOrder.order_number || selectedOrder.id.substring(0, 8)}</span></span>
+                    <span>Placed {format(new Date(selectedOrder.created_at), "MMM d, yyyy")}</span>
                   </div>
                   <div className="text-lg font-semibold">
                     Total: ${selectedOrder.total?.toFixed(2) || '0.00'}
                   </div>
                 </div>
-                <div className="w-full">
-                  <OrderStepper status={selectedOrder.payment_status} />
-                </div>
-                </div>
                 
-              <div className="bg-gray-50 rounded-lg">
-                <div className="max-h-[400px] overflow-y-auto">
-                  <div className="p-4 space-y-4">
-                    {selectedOrder.order_items?.map((item: any, index: number) => {
+                <div className="w-full">
+                  <OrderStepper status={selectedOrder.payment_status || selectedOrder.status} />
+                </div>
+
+                <div className="bg-gray-50 rounded-lg max-h-[400px] overflow-y-auto">
+                  <div className="divide-y">
+                    {selectedOrder.order_items?.map((item: any) => {
                       const isItemCancellable = selectedOrder.status !== 'cancelled' && isOrderCancellable(selectedOrder.created_at) && (item.status === undefined || item.status === null || item.status === 'active');
                       return (
-                        <div key={`${selectedOrder.id}-item-${index}`} className={`flex gap-4 items-center ${item.status === 'cancelled' ? 'opacity-60' : ''}`}>
+                        <div key={item.id} className={`flex gap-4 items-center p-4 ${item.status === 'cancelled' ? 'opacity-60' : ''}`}>
                           <div className="relative h-16 w-16 min-w-[4rem]">
                             <ProductImage
                               url={item.image_url || item.product_image || '/placeholder.png'}
@@ -494,9 +490,6 @@ export default function OrdersTab({ user }: { user: any }) {
                       </div>
                       <div className="flex-1">
                         <h4 className="font-medium text-sm">{item.product_name || item.name}</h4>
-                        {item.variant_name && (
-                          <p className="text-xs text-muted-foreground">{item.variant_name}</p>
-                        )}
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-sm">${(item.price || item.unit_price || 0).toFixed(2)}</span>
                           <span className="text-xs text-muted-foreground">× {item.quantity}</span>
@@ -526,7 +519,7 @@ export default function OrdersTab({ user }: { user: any }) {
                   </div>
                 </div>
               </div>
-          </div>
+            </>
           )}
         </DialogContent>
       </Dialog>

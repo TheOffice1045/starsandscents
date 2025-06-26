@@ -3,13 +3,15 @@
 import { Inter as GeistSans } from 'next/font/google';
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, ShoppingCart, Package, Users, DollarSign, Settings, ChevronDown, ChevronRight, Home, FolderOpen, BoxesIcon, ClipboardCheck, ClipboardList, PackageCheck, Store, TicketPercent, Wallet } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Package, Users, DollarSign, Settings, ChevronDown, ChevronRight, Home, FolderOpen, BoxesIcon, ClipboardCheck, ClipboardList, PackageCheck, Store, TicketPercent, Wallet, Bell } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { useState, useEffect } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { AdminContext } from "@/contexts/admin-context";
 import '@/styles/admin.css';
 import "../../styles/waldenburg.css";
+import { Providers } from '@/components/Providers';
+import { Toaster } from '@/components/ui/toaster';
 
 const geist = GeistSans({ 
   subsets: ['latin'],
@@ -47,6 +49,7 @@ const sidebarItems: SidebarItem[] = [
   { label: "Customers", href: "/admin/customers", icon: Users },
   { label: "Finance", href: "/admin/finance", icon: Wallet },
   { label: "Discounts", href: "/admin/discounts", icon: TicketPercent },
+  { label: "Notifications", href: "/admin/notifications", icon: Bell },
   { label: "My Store", href: "/", icon: Store, target: "_blank", rel: "noopener noreferrer" },
 ];
 
@@ -128,98 +131,100 @@ export default function AdminLayout({
   }
 
   return (
-    <AdminContext.Provider value={{ isAdmin: true }}>
-      <div className="font-waldenburg h-screen flex flex-col">
-      <AdminHeader className="border-b" />
-      <div className="flex-1 flex overflow-hidden">
-        <aside className="w-64 bg-white border-r flex flex-col">
-            <nav className="px-4 pt-6 flex-1 overflow-y-auto">
-            {sidebarItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              const isExpanded = expandedItems.includes(item.label);
-              const hasSubItems = Array.isArray(item.subItems) && item.subItems.length > 0;
+    <Providers>
+      <AdminContext.Provider value={{ isAdmin: true }}>
+        <div className={geist.className}>
+          <div className="h-screen flex flex-col">
+            <AdminHeader />
+            <div className="flex flex-1 overflow-hidden">
+              <aside className="w-64 bg-white border-r flex flex-col">
+                <nav className="px-4 pt-6 flex-1 overflow-y-auto">
+                  {sidebarItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = pathname === item.href;
+                    const isExpanded = expandedItems.includes(item.label);
+                    const hasSubItems = Array.isArray(item.subItems) && item.subItems.length > 0;
 
-              return (
-                <div key={item.label} className="py-2 first:pt-0">
-                  {!hasSubItems ? (
-                    <Link
-                      href={item.href || '#'}
-                      target={item.target}
-                      rel={item.rel}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg mb-1 text-sm ${
-                        isActive ? "bg-[#19191c] text-white" : "hover:bg-gray-100"
-                      }`}
-                    >
-                      <Icon size={18} />
-                      <span>{item.label}</span>
-                    </Link>
-                  ) : (
-                    <>
-                      <div
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg mb-1 cursor-pointer hover:bg-gray-100 text-sm"
-                        onClick={() => toggleExpand(item.label)}
-                      >
-                        <Icon size={18} />
-                        <span className="flex-1">{item.label}</span>
-                        {isExpanded ? (
-                          <ChevronDown size={14} />
+                    return (
+                      <div key={item.label} className="py-2 first:pt-0">
+                        {!hasSubItems ? (
+                          <Link
+                            href={item.href || '#'}
+                            target={item.target}
+                            rel={item.rel}
+                            className={`flex items-center gap-3 px-3 py-2 rounded-lg mb-1 text-sm ${
+                              isActive ? "bg-[#19191c] text-white" : "hover:bg-gray-100"
+                            }`}
+                          >
+                            <Icon size={18} />
+                            <span>{item.label}</span>
+                          </Link>
                         ) : (
-                          <ChevronRight size={14} />
+                          <>
+                            <div
+                              className="flex items-center gap-3 px-3 py-2 rounded-lg mb-1 cursor-pointer hover:bg-gray-100 text-sm"
+                              onClick={() => toggleExpand(item.label)}
+                            >
+                              <Icon size={18} />
+                              <span className="flex-1">{item.label}</span>
+                              {isExpanded ? (
+                                <ChevronDown size={14} />
+                              ) : (
+                                <ChevronRight size={14} />
+                              )}
+                            </div>
+                            {isExpanded && (
+                              <div className="ml-8 mb-2 space-y-1">
+                                {item.subItems?.map((subItem) => {
+                                  const SubIcon = subItem.icon;
+                                  return (
+                                    <Link
+                                      key={subItem.href}
+                                      href={subItem.href}
+                                      className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${
+                                        pathname === subItem.href
+                                          ? "bg-gray-100 text-[#19191c]"
+                                          : "hover:bg-gray-50"
+                                      }`}
+                                    >
+                                      {SubIcon && <SubIcon size={14} />}
+                                      {subItem.label}
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
-                      
-                      {isExpanded && (
-                        <div className="ml-8 mb-2 space-y-1">
-                          {item.subItems?.map((subItem) => {
-                            const SubIcon = subItem.icon;
-                            return (
-                              <Link
-                                key={subItem.href}
-                                href={subItem.href}
-                                className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${
-                                  pathname === subItem.href
-                                    ? "bg-gray-100 text-[#19191c]"
-                                    : "hover:bg-gray-50"
-                                }`}
-                              >
-                                {SubIcon && <SubIcon size={14} />}
-                                {subItem.label}
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </>
-                  )}
+                    );
+                  })}
+                </nav>
+                <div className="px-4 py-4 border-t">
+                  <Link
+                    href="/admin/settings"
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg ${
+                      pathname === "/admin/settings"
+                        ? "bg-[#19191c] text-white"
+                        : "hover:bg-gray-100"
+                    }`}
+                  >
+                    <Settings size={20} />
+                    <span>Settings</span>
+                  </Link>
                 </div>
-              );
-            })}
-          </nav>
-          
-          <div className="px-4 py-4 border-t">
-            <Link
-              href="/admin/settings"
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg ${
-                pathname === "/admin/settings"
-                  ? "bg-[#19191c] text-white"
-                  : "hover:bg-gray-100"
-              }`}
-            >
-              <Settings size={20} />
-              <span>Settings</span>
-            </Link>
+              </aside>
+              <main className="flex-1 overflow-y-auto bg-white">
+                {/* Removed static Dashboard title */}
+                <div className="p-8">
+                  {children}
+                </div>
+              </main>
+            </div>
           </div>
-        </aside>
-
-        <main className="flex-1 overflow-y-auto bg-white">
-          {/* Removed static Dashboard title */}
-          <div className="p-8">
-            {children}
-          </div>
-        </main>
-      </div>
-    </div>
-    </AdminContext.Provider>
+          <Toaster />
+        </div>
+      </AdminContext.Provider>
+    </Providers>
   );
 }

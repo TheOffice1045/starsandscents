@@ -16,7 +16,7 @@ import { AccountDropdown } from '@/components/user/AccountDropdown';
 import { createBrowserClient } from '@supabase/ssr';
 
 export function Header() {
-  const { settings } = useSettingsStore();
+  const { settings, fetchStoreSettings } = useSettingsStore();
   const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   
   // Add this to handle wishlist count
@@ -27,6 +27,7 @@ export function Header() {
   
   // Only run on client side to prevent hydration errors
   useEffect(() => {
+    fetchStoreSettings();
     setMounted(true);
     
     // Get current user
@@ -47,7 +48,7 @@ export function Header() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [supabase, fetchStoreSettings]);
 
   // Get user's first name or email
   const getUserName = () => {
@@ -72,8 +73,8 @@ export function Header() {
       <div className="bg-[#F6F6F8] text-sm py-2">
         <div className="container mx-auto px-4 flex justify-between items-center">
           <div className="flex items-center gap-6">
-            <span>+1 234 567 890</span>
-            <span>contact@example.com</span>
+            {mounted && settings.phone && <span>{settings.phone}</span>}
+            {mounted && settings.email && <span>{settings.email}</span>}
           </div>
           <div className="flex items-center gap-6">
             <select className="bg-transparent text-sm">

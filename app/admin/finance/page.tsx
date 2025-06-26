@@ -518,7 +518,6 @@ export default function FinancePage() {
                         </th>
                         <th className="px-6 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Type</th>
                         <th className="px-6 py-3 text-right align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Amount</th>
-                        <th className="px-6 py-3 text-right align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Fee</th>
                         <th className="px-6 py-3 text-right align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Net Amount</th>
                         <th className="px-6 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Status</th>
                         <th className="px-6 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>
@@ -545,18 +544,14 @@ export default function FinancePage() {
                     <tbody className="divide-y divide-gray-200">
                       {paginatedTransactions.map((transaction) => {
                         const dateTime = formatDateTime(transaction.created_at);
-                        const netAmount = transaction.amount - (transaction.fee || 0);
                         return (
                           <tr key={transaction.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-3 font-medium text-blue-600 text-left align-middle whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                #{transaction.id}
-                              </div>
+                            <td className="px-6 py-3 font-normal text-sm text-black text-left align-middle whitespace-nowrap hover:underline">
+                              {transaction.id}
                             </td>
                             <td className="px-6 py-3 text-sm text-left align-middle whitespace-nowrap">
                               <div>
-                                <div className="font-medium text-gray-900">{dateTime.date}</div>
+                                <div className="font-medium text-sm text-gray-900">{dateTime.date}</div>
                                 <div className="text-xs text-gray-500">{dateTime.time}</div>
                               </div>
                             </td>
@@ -576,12 +571,9 @@ export default function FinancePage() {
                                 {transaction.amount >= 0 ? '+' : ''}{formatPrice(transaction.amount)}
                               </span>
                             </td>
-                            <td className="px-6 py-3 text-sm text-right align-middle whitespace-nowrap text-gray-500">
-                              {transaction.fee ? formatPrice(transaction.fee) : '-'}
-                            </td>
                             <td className="px-6 py-3 text-sm font-medium text-right align-middle whitespace-nowrap">
-                              <span className={netAmount >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                {netAmount >= 0 ? '+' : ''}{formatPrice(netAmount)}
+                              <span className={transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                {transaction.amount >= 0 ? '+' : ''}{formatPrice(transaction.amount)}
                               </span>
                             </td>
                             <td className="px-6 py-3 text-left align-middle whitespace-nowrap">
@@ -613,7 +605,7 @@ export default function FinancePage() {
                             <td className="px-6 py-3 text-sm text-left align-middle whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 {getPaymentMethodIcon(transaction.payment_method)}
-                                <span className="text-gray-700">{transaction.payment_method || 'Credit Card'}</span>
+                                <span className="font-thin text-gray-700 text-sm">{transaction.payment_method || 'Credit Card'}</span>
                               </div>
                             </td>
                             <td className="px-6 py-3 text-sm text-left align-middle whitespace-nowrap">
@@ -621,14 +613,14 @@ export default function FinancePage() {
                                 <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
                                   <User className="w-3 h-3 text-gray-600" />
                                 </div>
-                                <span className="font-medium text-gray-900">{transaction.customer_name}</span>
+                                <span className="font-normal text-gray-700 text-sm">{transaction.customer_name}</span>
                               </div>
                             </td>
                             <td className="px-6 py-3 text-sm text-blue-600 text-left align-middle whitespace-nowrap">
                               <div className="flex items-center gap-2">
-                                <ShoppingCart className="w-4 h-4" />
+                                
                                 {transaction.order_number ? (
-                                  <Link href={`/admin/orders/${transaction.order_id}`} target="_blank" rel="noopener noreferrer" className="hover:underline text-blue-700 font-normal">
+                                  <Link href={`/admin/orders/${transaction.order_id}`} target="_blank" rel="noopener noreferrer" className="hover:underline text-gray-700 font-normal">
                                     {transaction.order_number}
                                   </Link>
                                 ) : (
@@ -773,7 +765,7 @@ export default function FinancePage() {
                     <p className="text-sm">{selectedTransaction.customer_name}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Payment Method</label>
+                    <label className="text-sm font-medium text-gray-700">Payment Method</label>
                     <p className="text-sm">{selectedTransaction.payment_method || 'Credit Card'}</p>
                   </div>
                   <div>

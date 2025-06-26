@@ -19,6 +19,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { AdminButton } from "@/components/ui/admin-button";
 
 export default function NewDiscountPage() {
   const router = useRouter();
@@ -181,12 +182,12 @@ export default function NewDiscountPage() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <h1 className="text-2xl font-semibold">Create New Discount</h1>
+          <h1 className="text-xl font-semibold">Create New Discount</h1>
         </div>
-        <Button onClick={handleButtonClick} disabled={isSubmitting}>
+        <AdminButton onClick={handleButtonClick} disabled={isSubmitting}>
           {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Create Discount
-        </Button>
+        </AdminButton>
       </div>
       
       <form onSubmit={handleSubmit}>
@@ -300,7 +301,7 @@ export default function NewDiscountPage() {
                   <label className="text-sm font-medium">Start Date</label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
+                      <AdminButton
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal",
@@ -308,7 +309,7 @@ export default function NewDiscountPage() {
                         )}
                       >
                         {startsAt ? format(startsAt, "PPP") : "Select date"}
-                      </Button>
+                      </AdminButton>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
                       <Calendar
@@ -324,7 +325,7 @@ export default function NewDiscountPage() {
                   <label className="text-sm font-medium">Expiry Date</label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
+                      <AdminButton
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal",
@@ -332,7 +333,7 @@ export default function NewDiscountPage() {
                         )}
                       >
                         {expiresAt ? format(expiresAt, "PPP") : "No expiry"}
-                      </Button>
+                      </AdminButton>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
                       <Calendar

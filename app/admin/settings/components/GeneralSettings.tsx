@@ -18,6 +18,8 @@ interface StoreSettings {
   timeZone: string;
   autoDST: boolean;
   logo?: string;
+  phone?: string;
+  email?: string;
   // ... other properties
 }
 
@@ -133,6 +135,8 @@ export default function GeneralSettings({ storeId }: GeneralSettingsProps) {
           store_name: settings.name || '',
           store_slogan: settings.slogan || '',
           store_logo: settings.logo || '',
+          phone: settings.phone || '',
+          email: settings.email || '',
           address_line1: settings.address?.line1 || '',
           address_line2: settings.address?.line2 || '',
           address_city: settings.address?.city || '',
@@ -185,6 +189,29 @@ export default function GeneralSettings({ storeId }: GeneralSettingsProps) {
             <p className="mt-2 text-sm text-gray-500">
               A catchy slogan that describes your store (optional).
             </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Phone Number
+            </label>
+            <Input 
+              placeholder="Enter phone number"
+              value={settings.phone || ''}
+              onChange={(e) => updateSettings({ phone: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Contact Email
+            </label>
+            <Input 
+              type="email"
+              placeholder="Enter contact email"
+              value={settings.email || ''}
+              onChange={(e) => updateSettings({ email: e.target.value })}
+            />
           </div>
 
           <div>
