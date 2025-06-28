@@ -533,7 +533,7 @@ export default function AdminOverviewPage() {
               <SelectItem value="7">Last 7 days</SelectItem>
               <SelectItem value="30">Last 30 days</SelectItem>
               <SelectItem value="90">Last 90 days</SelectItem>
-              <SelectItem value="365">This year</SelectItem>
+              <SelectItem value="365">Last 12 months</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -773,6 +773,8 @@ export default function AdminOverviewPage() {
                       tickLine={false}
                       axisLine={false}
                       tickMargin={8}
+                      angle={-45}
+                      textAnchor="end"
                       tickFormatter={(value) => {
                         if (value.startsWith('Week')) {
                           return value.replace('Week ', 'W');

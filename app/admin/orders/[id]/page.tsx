@@ -566,9 +566,9 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
                 <DropdownMenuContent align="end" className="w-48">
                   {order.fulfillment_status !== 'fulfilled' && (
                     <DropdownMenuItem onClick={() => router.push(`/admin/orders/${id}/edit`)}>
-                      <FileText className="mr-2 h-4 w-4" />
-                      Edit Order
-                    </DropdownMenuItem>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Edit Order
+                  </DropdownMenuItem>
                   )}
                   <DropdownMenuItem>
                     <DollarSign className="mr-2 h-4 w-4" />

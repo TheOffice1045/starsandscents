@@ -85,7 +85,7 @@ export default function FinancePage() {
       case "90":
         return "Last 90 days";
       case "365":
-        return "This year";
+        return "Last 12 months";
       default:
         return "Current period";
     }

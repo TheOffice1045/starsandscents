@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Pencil, Trash2, LayoutGrid, List } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, LayoutGrid, List, CheckCircle, XCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useCollectionStore } from "@/lib/store/collections";
 // Add Supabase client
@@ -473,50 +473,59 @@ export default function CollectionsPage() {
                                 {collection.status}
                               </span>
                             </td>
-                            <td className="px-10 py-3 text-right align-middle whitespace-nowrap">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleEdit(collection)}>
-                                    <Pencil className="mr-2 h-4 w-4" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <AlertDialog>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <AlertDialog>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleEdit(collection)}>
+                                      <Pencil className="mr-2 h-4 w-4" />
+                                      <span>Edit</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => toggleStatus(collection.id)}>
+                                      {collection.status === 'Active' ? (
+                                        <>
+                                          <XCircle className="mr-2 h-4 w-4" />
+                                          <span>Deactivate</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <CheckCircle className="mr-2 h-4 w-4" />
+                                          <span>Activate</span>
+                                        </>
+                                      )}
+                                    </DropdownMenuItem>
                                     <AlertDialogTrigger asChild>
-                                      <DropdownMenuItem 
-                                        className="text-red-600"
-                                        onSelect={(e) => {
-                                          e.preventDefault();
-                                        }}
-                                      >
+                                      <DropdownMenuItem>
                                         <Trash2 className="mr-2 h-4 w-4" />
-                                        Delete
+                                        <span>Delete</span>
                                       </DropdownMenuItem>
                                     </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Delete Collection</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Are you sure you want to delete this collection? This action cannot be undone.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction
-                                          onClick={() => handleDeleteCollection(collection.id)}
-                                          className="bg-red-500 hover:bg-red-600"
-                                        >
-                                          Delete
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action cannot be undone. This will permanently delete
+                                      the collection.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteCollection(collection.id)}
+                                      className="bg-red-500 hover:bg-red-600"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </td>
                           </DraggableRow>
                         );

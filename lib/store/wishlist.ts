@@ -113,6 +113,9 @@ export const useWishlistStore = create<WishlistState>()(
 
         const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
         
+        // Clear local state before syncing
+        get().clearWishlist();
+        
         try {
           const { data: wishlistItems, error } = await supabase
             .from('wishlist')

@@ -77,8 +77,8 @@ function DraggableRow({ id, children, handle, ...props }: { id: string; children
     background: isDragging ? '#f3f4f6' : undefined,
   };
   return (
-    <tr ref={setNodeRef} style={style} {...attributes} {...props}>
-      <td className="pl-2 pr-0 w-6 align-middle cursor-grab select-none" style={{ verticalAlign: 'middle' }}>
+    <tr ref={setNodeRef} style={style} {...attributes} {...props} className="bg-white">
+      <td className="pl-2 pr-0 w-6 align-middle cursor-grab select-none sticky left-0 z-10" style={{ verticalAlign: 'middle', background: 'inherit' }}>
         {typeof handle === 'function' ? handle({ listeners }) : null}
       </td>
       {children}
@@ -991,96 +991,52 @@ export default function ProductsPage() {
                     items={productOrder}
                     strategy={verticalListSortingStrategy}
                   >
-                    <table className="w-full" style={{ border: '1px solid #e5e5e5', borderRadius: '12px', overflow: 'hidden' }}>
-                      <thead>
-                        <tr className="border-b" style={{ background: '#f5f5f5', color: '#0a0a0a' }}>
-                          <th className="pl-2 pr-0 w-6"></th>
-                          <th className="pl-6 pr-2 py-3 text-left align-middle">
-                            <Checkbox 
-                              checked={selectedProducts.length === filteredInventory.length && filteredInventory.length > 0}
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th scope="col" className="w-6 cursor-grab select-none sticky left-0 z-20 bg-gray-50"></th>
+                          <th scope="col" className="w-12 px-2 align-middle sticky left-6 z-20 bg-gray-50">
+                            <Checkbox
+                              checked={!loading && products.length > 0 && selectedProducts.length === products.length}
                               onCheckedChange={toggleSelectAll}
-                              aria-label="Select all products"
                             />
                           </th>
-                          <th 
-                            className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap"
-                            onClick={() => handleSort("title")}
-                            style={{ color: '#0a0a0a' }}
-                          >
-                            <div className="flex items-center">
+                          <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6 sticky left-[4.5rem] z-10 bg-gray-50">
+                            <div onClick={() => handleSort('title')} className="flex items-center cursor-pointer">
                               Product
-                              {sortField === "title" && (
-                                <span className="ml-1">
-                                  {sortDirection === "asc" ? "↑" : "↓"}
-                                </span>
-                              )}
+                              <SortIndicator field="title" />
                             </div>
                           </th>
-                          <th 
-                            className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap"
-                            style={{ color: '#0a0a0a' }}
-                          >
+                          <th scope="col" className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap sticky left-[14.5rem] z-10 bg-gray-50">
                             Description
                           </th>
-                          <th 
-                            className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap"
-                            onClick={() => handleSort("sku")}
-                            style={{ color: '#0a0a0a' }}
-                          >
-                            <div className="flex items-center">
+                          <th scope="col" className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap sticky left-[24.5rem] z-10 bg-gray-50">
+                            <div onClick={() => handleSort('sku')} className="flex items-center cursor-pointer">
                               SKU
-                              {sortField === "sku" && (
-                                <span className="ml-1">
-                                  {sortDirection === "asc" ? "↑" : "↓"}
-                                </span>
-                              )}
+                              <SortIndicator field="sku" />
                             </div>
                           </th>
-                          <th 
-                            className="px-10 py-3 text-right align-middle text-sm font-medium whitespace-nowrap"
-                            onClick={() => handleSort("price")}
-                            style={{ color: '#0a0a0a' }}
-                          >
-                            <div className="flex items-center">
+                          <th scope="col" className="px-10 py-3 text-right align-middle text-sm font-medium whitespace-nowrap sticky left-[34.5rem] z-10 bg-gray-50">
+                            <div onClick={() => handleSort('price')} className="flex items-center cursor-pointer">
                               Price
-                              {sortField === "price" && (
-                                <span className="ml-1">
-                                  {sortDirection === "asc" ? "↑" : "↓"}
-                                </span>
-                              )}
+                              <SortIndicator field="price" />
                             </div>
                           </th>
-                          <th 
-                            className="px-10 py-3 text-right align-middle text-sm font-medium whitespace-nowrap"
-                            onClick={() => handleSort("quantity")}
-                            style={{ color: '#0a0a0a' }}
-                          >
-                            <div className="flex items-center">
+                          <th scope="col" className="px-10 py-3 text-right align-middle text-sm font-medium whitespace-nowrap sticky left-[44.5rem] z-10 bg-gray-50">
+                            <div onClick={() => handleSort('quantity')} className="flex items-center cursor-pointer">
                               Stock
-                              {sortField === "quantity" && (
-                                <span className="ml-1">
-                                  {sortDirection === "asc" ? "↑" : "↓"}
-                                </span>
-                              )}
+                              <SortIndicator field="quantity" />
                             </div>
                           </th>
-                          <th 
-                            className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap"
-                            onClick={() => handleSort("status")}
-                            style={{ color: '#0a0a0a' }}
-                          >
-                            <div className="flex items-center">
+                          <th scope="col" className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap sticky left-[54.5rem] z-10 bg-gray-50">
+                            <div onClick={() => handleSort('status')} className="flex items-center cursor-pointer">
                               Status
-                              {sortField === "status" && (
-                                <span className="ml-1">
-                                  {sortDirection === "asc" ? "↑" : "↓"}
-                                </span>
-                              )}
+                              <SortIndicator field="status" />
                             </div>
                           </th>
-                          <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Stock Status</th>
-                          <th className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Collection</th>
-                          <th className="px-10 py-3 text-right align-middle text-sm font-medium whitespace-nowrap" style={{ color: '#0a0a0a' }}>Actions</th>
+                          <th scope="col" className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap sticky left-[64.5rem] z-10 bg-gray-50">Stock Status</th>
+                          <th scope="col" className="px-10 py-3 text-left align-middle text-sm font-medium whitespace-nowrap sticky left-[74.5rem] z-10 bg-gray-50">Collection</th>
+                          <th scope="col" className="px-10 py-3 text-right align-middle text-sm font-medium whitespace-nowrap sticky left-[84.5rem] z-10 bg-gray-50">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -1090,31 +1046,31 @@ export default function ProductsPage() {
                           const statusInfo = formatStatus(product.status);
                           const stockStatus = (product.quantity ?? 0) < 5 ? 'Low' : 'In Stock';
                           return (
-                            <DraggableRow key={product.id} id={product.id} handle={({ listeners }) => (
-                              <span {...listeners} aria-label="Drag row" tabIndex={0} className="flex items-center justify-center h-6 w-6 text-gray-400 hover:text-gray-600 focus:outline-none">
-                                <GripVertical className="h-4 w-4" />
-                              </span>
-                            )}>
-                              <td className="pl-6 pr-2 py-3">
-                                <Checkbox 
+                            <DraggableRow 
+                              key={product.id} 
+                              id={product.id}
+                              handle={({ listeners }) => <GripVertical {...listeners} className="h-5 w-5 text-gray-400" />}
+                            >
+                              <td className="w-12 px-2 align-middle sticky left-6 bg-inherit z-10">
+                                <Checkbox
                                   checked={selectedProducts.includes(product.id)}
                                   onCheckedChange={() => toggleProductSelection(product.id)}
-                                  aria-label={`Select ${product.title}`}
+                                  aria-label="Select product"
                                 />
                               </td>
-                              <td className="px-10 py-3 whitespace-nowrap align-middle text-left">
-                                <div 
-                                  className="flex items-center cursor-pointer" 
-                                  onClick={() => handleEdit(product)}
-                                >
-                                  <div className="relative h-10 w-10 mr-3">
+                              <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 sticky left-[4.5rem] bg-inherit z-10">
+                                <div className="flex items-center">
+                                  <div className="h-16 w-16 flex-shrink-0">
                                     <ProductImage 
-                                      url={product.images?.[0]?.url} 
-                                      alt={product.images?.[0]?.alt_text || `Product: ${product.title}`}
+                                      url={product.images && product.images.length > 0 ? product.images[0].url : '/placeholder.png'} 
+                                      alt={product.title} 
+                                      className="rounded-md object-cover"
                                     />
                                   </div>
-                                  <div>
-                                    <div className="font-medium text-[14px] whitespace-nowrap">{product.title}</div>
+                                  <div className="ml-4 max-w-xs">
+                                    <Link href={`/admin/products/edit/${product.id}`} className="font-medium text-gray-900 hover:text-gray-600 break-words">
+                                      {truncateText(product.title, 60)}
+                                    </Link>
                                   </div>
                                 </div>
                               </td>

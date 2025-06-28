@@ -376,9 +376,9 @@ export default function OrdersPage() {
          Fulfill
        </DropdownMenuItem>
        {row.fulfillment_status !== 'fulfilled' && (
-         <DropdownMenuItem onClick={() => handleEditOrder(row.id)}>
-           Edit
-         </DropdownMenuItem>
+       <DropdownMenuItem onClick={() => handleEditOrder(row.id)}>
+         Edit
+       </DropdownMenuItem>
        )}
        <DropdownMenuItem onClick={() => openDeleteDialog(row.id)} className="text-red-600">
          Delete
@@ -630,9 +630,9 @@ export default function OrdersPage() {
                        Fulfill
                      </DropdownMenuItem>
                      {order.fulfillment_status !== 'fulfilled' && (
-                       <DropdownMenuItem onClick={() => handleEditOrder(order.id)}>
-                         Edit
-                       </DropdownMenuItem>
+                     <DropdownMenuItem onClick={() => handleEditOrder(order.id)}>
+                       Edit
+                     </DropdownMenuItem>
                      )}
                      <DropdownMenuItem onClick={() => openDeleteDialog(order.id)} className="text-red-600">
                        Delete
