@@ -76,13 +76,6 @@ export function Header() {
             {mounted && settings.phone && <span>{settings.phone}</span>}
             {mounted && settings.email && <span>{settings.email}</span>}
           </div>
-          <div className="flex items-center gap-6">
-            <select className="bg-transparent text-sm">
-              <option>English</option>
-              <option>French</option>
-              <option>German</option>
-            </select>
-          </div>
         </div>
       </div>
 
