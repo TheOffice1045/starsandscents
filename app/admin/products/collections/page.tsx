@@ -516,12 +516,16 @@ export default function CollectionsPage() {
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDeleteCollection(collection.id)}
-                                      className="bg-red-500 hover:bg-red-600"
-                                    >
-                                      Delete
+                                    <AlertDialogCancel asChild>
+                                      <AdminButton variant="outline">Cancel</AdminButton>
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction asChild>
+                                      <AdminButton
+                                        variant="default"
+                                        onClick={() => handleDeleteCollection(collection.id)}
+                                      >
+                                        Delete
+                                      </AdminButton>
                                     </AlertDialogAction>
                                   </AlertDialogFooter>
                                 </AlertDialogContent>

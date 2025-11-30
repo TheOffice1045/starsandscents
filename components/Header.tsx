@@ -78,17 +78,10 @@ export function Header() {
           </div>
           <div className="flex items-center gap-6">
             <select className="bg-transparent text-sm">
-              <option>USD</option>
-              <option>EUR</option>
-              <option>GBP</option>
-            </select>
-            <select className="bg-transparent text-sm">
               <option>English</option>
-              <option>Frenche</option>
+              <option>French</option>
               <option>German</option>
             </select>
-            
-            
           </div>
         </div>
       </div>

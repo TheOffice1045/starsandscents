@@ -839,9 +839,9 @@ export default function ProductsPage() {
                         Bulk Apply Price
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={openBulkDeleteDialog}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Selected
-                      </DropdownMenuItem>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Selected
+                          </DropdownMenuItem>
                     </>
                   )}
                 </DropdownMenuContent>
@@ -996,7 +996,7 @@ export default function ProductsPage() {
                         <tr>
                           <th scope="col" className="w-6 cursor-grab select-none sticky left-0 z-20 bg-gray-50"></th>
                           <th scope="col" className="w-12 px-2 align-middle sticky left-6 z-20 bg-gray-50">
-                            <Checkbox
+                            <Checkbox 
                               checked={!loading && products.length > 0 && selectedProducts.length === products.length}
                               onCheckedChange={toggleSelectAll}
                             />
@@ -1052,7 +1052,7 @@ export default function ProductsPage() {
                               handle={({ listeners }) => <GripVertical {...listeners} className="h-5 w-5 text-gray-400" />}
                             >
                               <td className="w-12 px-2 align-middle sticky left-6 bg-inherit z-10">
-                                <Checkbox
+                                <Checkbox 
                                   checked={selectedProducts.includes(product.id)}
                                   onCheckedChange={() => toggleProductSelection(product.id)}
                                   aria-label="Select product"
@@ -1242,9 +1242,9 @@ export default function ProductsPage() {
                                     </DropdownMenuItem>
                                     
                                     <DropdownMenuItem onClick={() => openDeleteDialog(product.id)}>
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Delete
-                                    </DropdownMenuItem>
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          Delete
+                                        </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </td>
