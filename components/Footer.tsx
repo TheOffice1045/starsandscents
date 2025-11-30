@@ -1,25 +1,13 @@
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { createBrowserClient } from '@supabase/ssr';
+import { useEffect } from "react";
+import { useSettingsStore } from "@/lib/store/settings";
 
 export function Footer() {
-  const [siteName, setSiteName] = useState("[Site Name]");
-  const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-  
+  const { settings, fetchStoreSettings } = useSettingsStore();
+
   useEffect(() => {
-    const fetchSiteName = async () => {
-      const { data, error } = await supabase
-        .from('store_settings')
-        .select('store_name')
-        .single();
-        
-      if (!error && data?.store_name) {
-        setSiteName(data.store_name);
-      }
-    };
-    
-    fetchSiteName();
-  }, [supabase]);
+    fetchStoreSettings();
+  }, [fetchStoreSettings]);
 
   return (
     <footer className="bg-white border-t mt-auto">
@@ -69,7 +57,7 @@ export function Footer() {
         </div>
 
         <div className="border-t py-6 text-center text-sm text-gray-600">
-          © {new Date().getFullYear()} {siteName}. All rights reserved.
+          &copy; {new Date().getFullYear()} {settings.name} | All rights reserved.
         </div>
       </div>
     </footer>

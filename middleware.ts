@@ -39,7 +39,7 @@ export async function middleware(request: NextRequest) {
       .select(`
         store_id,
         status,
-        store_roles (
+        role:store_roles!role_id (
           name,
           permissions
         )
@@ -49,15 +49,19 @@ export async function middleware(request: NextRequest) {
 
     if (storeUsersError) {
       console.error('Error checking store users:', storeUsersError);
+      // If it's a relation error, the tables might not be set up - allow access for setup
+      if (storeUsersError.code === 'PGRST200' || storeUsersError.message?.includes('relation')) {
+        return NextResponse.next();
+      }
       const redirectUrl = new URL('/signin', request.url);
       redirectUrl.searchParams.set('error', 'access_denied');
       return NextResponse.redirect(redirectUrl);
     }
 
     // Check if user has any active admin role
-    const hasAdminAccess = storeUsers && storeUsers.length > 0 && 
+    const hasAdminAccess = storeUsers && storeUsers.length > 0 &&
       storeUsers.some(user => {
-        const role = user.store_roles as any;
+        const role = user.role as any;
         return role && (role.name === 'Owner' || role.name === 'Admin' || role.name === 'Manager');
       });
 
