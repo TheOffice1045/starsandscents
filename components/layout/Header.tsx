@@ -36,7 +36,6 @@ export default function Header() {
       <div className="bg-gray-50 py-2 text-sm text-gray-600">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex gap-4">
-            {settings.phone && <span>{settings.phone}</span>}
             {settings.email && <span>{settings.email}</span>}
           </div>
         </div>

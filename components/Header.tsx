@@ -73,7 +73,6 @@ export function Header() {
       <div className="bg-[#F6F6F8] text-sm py-2">
         <div className="container mx-auto px-4 flex justify-between items-center">
           <div className="flex items-center gap-6">
-            {mounted && settings.phone && <span>{settings.phone}</span>}
             {mounted && settings.email && <span>{settings.email}</span>}
           </div>
         </div>
