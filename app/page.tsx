@@ -130,7 +130,7 @@ export default function Home() {
               {siteConfig.description && (
                 <p className="text-xs opacity-90 mb-4">{siteConfig.description}</p>
               )}
-              <h1 className="text-6xl font-medium mb-8">Stars And Scents</h1>
+              <h1 className="text-6xl font-medium mb-8">TLC Candles</h1>
               <Link href="/shop">
                 <Button 
                   variant="secondary" 
