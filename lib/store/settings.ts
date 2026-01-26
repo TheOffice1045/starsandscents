@@ -65,7 +65,7 @@ const createSettingsStore: StateCreator<SettingsState> = (set) => ({
     currency: 'USD',
     language: 'en',
     notifications: true,
-    name: 'TLC Candles',
+    name: 'Stars And Scents',
     slogan: '',
     logo: '',
     phone: '',

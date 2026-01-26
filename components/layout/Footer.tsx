@@ -13,7 +13,7 @@ export default function Footer() {
               Stars & Scent
             </Link>
             <p className="text-gray-600 mb-4">
-              TLC Candles was born from a $200 birthday gift and a challenge to dream big. A sister-brother team proudly co-owning and creating handcrafted candles.
+              Stars And Scents was born from a $200 birthday gift and a challenge to dream big. A sister-brother team proudly co-owning and creating handcrafted candles.
             </p>
             <div className="flex gap-4">
               <a href="#" className="text-gray-600 hover:text-[#4A332F]">

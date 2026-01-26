@@ -143,7 +143,7 @@ export default function AboutPage() {
       <div className="container mx-auto py-16 px-6">
         <h2 className="text-2xl font-medium mb-5 text-center">Behind The Brand</h2>
         <p className="text-sm text-gray-700 text-center max-w-3xl mx-auto mb-12 leading-relaxed">
-          TLC Candles was born from a $200 birthday gift and a challenge to dream big. Our founder started this journey at just 10 years old in 2022, learning to make candles from scratch and turning that skill into a real business. Now joined by her brother, together they run every part of the operation—from crafting each candle by hand to connecting with customers. We&apos;re proof that with creativity, hard work, and a little family support, anything is possible.
+          Stars And Scents was born from a $200 birthday gift and a challenge to dream big. Our founder started this journey at just 10 years old in 2022, learning to make candles from scratch and turning that skill into a real business. Now joined by her brother, together they run every part of the operation—from crafting each candle by hand to connecting with customers. We&apos;re proof that with creativity, hard work, and a little family support, anything is possible.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
