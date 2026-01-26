@@ -130,7 +130,7 @@ export default function Home() {
               {siteConfig.description && (
                 <p className="text-xs opacity-90 mb-4">{siteConfig.description}</p>
               )}
-              <h1 className="text-6xl font-medium mb-8">Lavender Candle</h1>
+              <h1 className="text-6xl font-medium mb-8">TLC Candles</h1>
               <Link href="/shop">
                 <Button 
                   variant="secondary" 
@@ -183,10 +183,7 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/70">
             <div className="container mx-auto h-full flex items-center justify-end">
               <div className="text-white max-w-md pr-8">
-                <h2 className="text-4xl font-medium mb-4">There Are Many Fragrances For You</h2>
-                <p className="text-sm mb-8 opacity-90">
-                  Lorem ipsum dolor sit amet, his convenire similique efficiendi et, et ius brute lation inermis
-                </p>
+                <h2 className="text-4xl font-medium mb-4">Fragrances for Every Occasion</h2>
                 <Link href="/shop">
                   <Button className="bg-white hover:bg-gray-100 text-black font-medium px-8">
                     SHOP NOW

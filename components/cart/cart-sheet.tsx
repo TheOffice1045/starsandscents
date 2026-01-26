@@ -25,7 +25,19 @@ export function CartSheet({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (
       toast.error("Your cart is empty");
       return;
     }
-    
+
+    // Filter out invalid items (missing ID or invalid data)
+    const validItems = items.filter(item => item.id && item.price > 0);
+
+    if (validItems.length === 0) {
+      toast.error("Your cart contains invalid items. Please clear your cart and try again.");
+      return;
+    }
+
+    if (validItems.length !== items.length) {
+      toast.warning("Some invalid items were removed from checkout.");
+    }
+
     setIsLoading(true);
     try {
       // Create a checkout session on the server
@@ -35,10 +47,10 @@ export function CartSheet({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          items: items.map(item => ({
+          items: validItems.map(item => ({
             id: item.id,
             name: item.name,
-            price: Math.round(item.price * 100), // Convert to cents for Stripe
+            price: item.price, // Price in dollars - API handles conversion to cents
             quantity: item.quantity,
             image: item.image
           }))
@@ -114,13 +126,26 @@ export function CartSheet({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (
             <span>${totalPrice.toFixed(2)}</span>
           </div>
           
-          <Button 
-            onClick={handleCheckout} 
-            className="w-full bg-[#5D4037] hover:bg-[#3E2723] text-white" 
+          <Button
+            onClick={handleCheckout}
+            className="w-full bg-[#5D4037] hover:bg-[#3E2723] text-white"
             disabled={items.length === 0 || isLoading}
           >
             {isLoading ? 'Processing...' : 'Checkout'}
           </Button>
+
+          {items.length > 0 && (
+            <Button
+              onClick={() => {
+                clearCart();
+                toast.success('Cart cleared');
+              }}
+              variant="outline"
+              className="w-full mt-2"
+            >
+              Clear Cart
+            </Button>
+          )}
         </div>
       </SheetContent>
     </Sheet>

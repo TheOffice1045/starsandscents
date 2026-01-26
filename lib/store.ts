@@ -68,7 +68,7 @@ export const useStore = create<StoreState>()(
       },
     }),
     {
-      name: "cart-storage",
+      name: "legacy-cart-storage",
     }
   )
 );

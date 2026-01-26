@@ -40,7 +40,7 @@ export default function ReturnsPage() {
         <section>
           <h2 className="text-2xl font-semibold mb-4">Damaged Items</h2>
           <p>
-            If you receive a damaged item, please contact us within 48 hours of delivery. We&apos;ll provide a prepaid return label and send a replacement immediately.
+            If you receive a damaged item, please contact us within 48 hours of delivery. We&apos;ll contact you to refund or replace the item.
           </p>
         </section>
       </div>

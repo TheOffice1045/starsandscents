@@ -62,7 +62,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
     const cartItem: Omit<CartItem, 'quantity'> = {
-      id: Number(product.id),
+      id: product.id,
       name: productName,
       price: productPrice,
       image: imageUrl,

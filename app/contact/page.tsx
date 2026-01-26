@@ -71,15 +71,11 @@ export default function ContactPage() {
             <div className="space-y-4">
               <div>
                 <h3 className="font-semibold mb-2">Email</h3>
-                <p className="text-muted-foreground">support@serenitycandles.com</p>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Phone</h3>
-                <p className="text-muted-foreground">(555) 123-4567</p>
+                <p className="text-muted-foreground">thestarsandscents@gmail.com</p>
               </div>
               <div>
                 <h3 className="font-semibold mb-2">Hours</h3>
-                <p className="text-muted-foreground">Monday - Friday: 9am - 5pm EST</p>
+                <p className="text-muted-foreground">Monday - Friday: 9am - 5pm PST</p>
               </div>
             </div>
           </div>

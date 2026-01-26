@@ -22,10 +22,10 @@ export function QuickViewModal({ product, isOpen, onClose }: QuickViewModalProps
 
   const handleAddToCart = () => {
     addItem({
-      id: Number(product.id),
-      name: product.name || '',
+      id: product.id,
+      name: product.name || product.title || '',
       price: product.price || 0,
-      image: product.image || '',
+      image: product.image || product.images?.[0]?.url || '',
       stock: product.quantity || 0,
     });
     onClose();

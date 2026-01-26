@@ -9,13 +9,13 @@ export default function ShippingPage() {
             <div className="border rounded-lg p-6">
               <h3 className="text-xl font-semibold mb-2">Standard Shipping</h3>
               <p className="text-muted-foreground mb-2">5-7 business days</p>
-              <p className="font-semibold">$5.99</p>
-              <p className="text-sm text-muted-foreground mt-2">Free on orders over $50</p>
+              <p className="font-semibold">Calculated at Checkout</p>
+              <p className="text-sm text-muted-foreground mt-2">Free on orders over $150</p>
             </div>
             <div className="border rounded-lg p-6">
               <h3 className="text-xl font-semibold mb-2">Express Shipping</h3>
               <p className="text-muted-foreground mb-2">2-3 business days</p>
-              <p className="font-semibold">$12.99</p>
+              <p className="font-semibold">Calculated at Checkout</p>
             </div>
           </div>
         </section>

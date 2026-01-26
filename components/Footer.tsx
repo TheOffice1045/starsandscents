@@ -16,7 +16,7 @@ export function Footer() {
           <div className="space-y-4">
             <h3 className="font-medium">About Us</h3>
             <p className="text-sm text-gray-600 leading-relaxed">
-              Handcrafted candles made with love and care. Each piece is uniquely created to bring warmth and ambiance to your space.
+              TLC Candles was born from a $200 birthday gift and a challenge to dream big. A sister-brother team proudly co-owning and creating handcrafted candles.
             </p>
           </div>
 

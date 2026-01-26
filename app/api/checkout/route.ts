@@ -45,6 +45,14 @@ export async function POST(req: Request) {
 
     // Verify stock levels for all items
     for (const item of items) {
+      // Validate item has required fields
+      if (!item.id) {
+        return NextResponse.json(
+          { message: 'Invalid cart item: missing product ID' },
+          { status: 400 }
+        );
+      }
+
       const { data: product } = await supabase
         .from('products')
         .select('quantity')
@@ -53,7 +61,7 @@ export async function POST(req: Request) {
 
       if (!product) {
         return NextResponse.json(
-          { message: `Product ${item.id} not found` },
+          { message: `Product not found: ${item.name || item.id}` },
           { status: 400 }
         );
       }
@@ -73,14 +81,22 @@ export async function POST(req: Request) {
     const lineItems = items.map((item: any) => {
       // Ensure item has a name, use fallback if missing
       const name = item.name || 'Product';
-      
+
       // Limit image URL length to avoid URL size issues
       let imageUrl = null;
       if (item.image) {
         // Only use the image if it's not too long
         imageUrl = item.image.length < 500 ? item.image : null;
       }
-      
+
+      // Price should be in dollars - if it's over 1000, it's likely already in cents (old bug)
+      // Most products won't cost over $1000, so this is a reasonable sanity check
+      let priceInDollars = item.price;
+      if (priceInDollars > 1000) {
+        // Assume it's already in cents, convert back to dollars
+        priceInDollars = priceInDollars / 100;
+      }
+
       return {
         price_data: {
           currency: 'usd',
@@ -91,7 +107,7 @@ export async function POST(req: Request) {
               product_id: item.id
             }
           },
-          unit_amount: Math.round(item.price * 100), // Convert to cents for Stripe
+          unit_amount: Math.round(priceInDollars * 100), // Convert to cents for Stripe
         },
         quantity: item.quantity || 1, // Default to 1 if quantity is missing
       };
