@@ -107,6 +107,26 @@ export default function CheckoutPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+
+        // Handle invalid products by removing them from cart
+        if (errorData.errorType === 'invalid_products' && errorData.invalidProducts) {
+          const invalidIds = errorData.invalidProducts.map((p: { id: string }) => p.id);
+          const invalidNames = errorData.invalidProducts.map((p: { name: string }) => p.name);
+
+          // Remove invalid products from cart
+          invalidIds.forEach((id: string) => {
+            if (id !== 'unknown') {
+              removeFromCart(id);
+            }
+          });
+
+          toast.error(`Removed unavailable products: ${invalidNames.join(', ')}`, {
+            description: 'These products are no longer in our catalog. Please review your cart.',
+            duration: 5000
+          });
+          return;
+        }
+
         throw new Error(errorData.message || 'Failed to create checkout session');
       }
 

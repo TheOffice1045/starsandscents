@@ -43,14 +43,19 @@ export async function POST(req: Request) {
       customerEmail = body.email;
     }
 
-    // Verify stock levels for all items
+    // Verify stock levels for all items and collect invalid products
+    const invalidProducts: { id: string; name: string; reason: string }[] = [];
+    const outOfStockProducts: { id: string; name: string; available: number }[] = [];
+
     for (const item of items) {
       // Validate item has required fields
       if (!item.id) {
-        return NextResponse.json(
-          { message: 'Invalid cart item: missing product ID' },
-          { status: 400 }
-        );
+        invalidProducts.push({
+          id: 'unknown',
+          name: item.name || 'Unknown product',
+          reason: 'missing_id'
+        });
+        continue;
       }
 
       const { data: product } = await supabase
@@ -60,21 +65,46 @@ export async function POST(req: Request) {
         .single();
 
       if (!product) {
-        return NextResponse.json(
-          { message: `Product not found: ${item.name || item.id}` },
-          { status: 400 }
-        );
+        invalidProducts.push({
+          id: item.id,
+          name: item.name || item.id,
+          reason: 'not_found'
+        });
+        continue;
       }
 
       if (product.quantity < item.quantity) {
-        return NextResponse.json(
-          { 
-            message: `Out of stock! ${item.name}. Available: ${product.quantity}`,
-            availableQuantity: product.quantity
-          },
-          { status: 400 }
-        );
+        outOfStockProducts.push({
+          id: item.id,
+          name: item.name || item.id,
+          available: product.quantity
+        });
       }
+    }
+
+    // Return error with details about invalid products so client can remove them
+    if (invalidProducts.length > 0) {
+      return NextResponse.json(
+        {
+          message: `Some products in your cart are no longer available`,
+          invalidProducts,
+          errorType: 'invalid_products'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Return error with details about out of stock products
+    if (outOfStockProducts.length > 0) {
+      const product = outOfStockProducts[0];
+      return NextResponse.json(
+        {
+          message: `Out of stock! ${product.name}. Available: ${product.available}`,
+          outOfStockProducts,
+          errorType: 'out_of_stock'
+        },
+        { status: 400 }
+      );
     }
 
     // Prepare line items for Stripe
