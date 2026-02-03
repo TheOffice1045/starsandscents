@@ -119,13 +119,9 @@ export async function POST(req: Request) {
         imageUrl = item.image.length < 500 ? item.image : null;
       }
 
-      // Price should be in dollars - if it's over 1000, it's likely already in cents (old bug)
-      // Most products won't cost over $1000, so this is a reasonable sanity check
-      let priceInDollars = item.price;
-      if (priceInDollars > 1000) {
-        // Assume it's already in cents, convert back to dollars
-        priceInDollars = priceInDollars / 100;
-      }
+      // Price from cart is in dollars (e.g., 15.00 for $15)
+      // Stripe expects cents (e.g., 1500 for $15)
+      const priceInCents = Math.round(item.price * 100);
 
       return {
         price_data: {
@@ -137,7 +133,7 @@ export async function POST(req: Request) {
               product_id: item.id
             }
           },
-          unit_amount: Math.round(priceInDollars * 100), // Convert to cents for Stripe
+          unit_amount: priceInCents,
         },
         quantity: item.quantity || 1, // Default to 1 if quantity is missing
       };
