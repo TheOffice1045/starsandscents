@@ -39,7 +39,7 @@ export function CartSheet() {
         items: items.map(item => ({
           id: item.id,
           name: item.name,
-          price: Math.round(item.price * 100), // Convert to cents for Stripe
+          price: item.price, // Keep as dollars, API will convert to cents
           quantity: item.quantity,
           image: item.image
         }))
