@@ -130,7 +130,7 @@ export function CartSheet() {
                 <span>${getTotalPrice().toFixed(2)}</span>
               </div>
               <div className="space-y-2">
-                <Button 
+                <Button
                   className="w-full bg-[#4A332F] text-white hover:bg-white hover:text-[#4A332F] border border-[#4A332F]"
                   onClick={handleCheckout}
                   disabled={isLoading}
@@ -141,12 +141,47 @@ export function CartSheet() {
                       Processing...
                     </>
                   ) : (
-                    'Checkout'
+                    'Checkout with Stripe'
                   )}
                 </Button>
+
+                <div className="relative my-3">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-200"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="px-2 bg-white text-gray-500">OR</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-center space-x-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-xs flex items-center justify-center border-[#008CFF] text-[#008CFF] hover:bg-[#008CFF] hover:text-white shadow-sm"
+                    onClick={() => window.open('https://account.venmo.com/u/StarsScents', '_blank')}
+                  >
+                    <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M19.5 3.5h-15c-1.1 0-2 .9-2 2v13c0 1.1.9 2 2 2h15c1.1 0 2-.9 2-2v-13c0-1.1-.9-2-2-2zm-8.79 14c-3.03 0-4.71-1.4-4.71-3.2 0-1.42.8-2.78 2.21-3.37.65-.27 1.21-.09 1.64.29.33.3.5.71.5 1.18 0 .26-.08.52-.22.73-.13.21-.3.38-.51.51-.45.26-.91.39-1.37.39-.22 0-.44-.03-.65-.1.19.65.78 1.07 1.5 1.07.41 0 .8-.12 1.13-.35.33-.23.6-.55.77-.93l1.5-5.3c.11-.4.38-.6.7-.6.31 0 .58.2.69.6l2.4 8.2c.05.17.06.34.02.51-.04.17-.13.32-.26.44-.13.12-.28.2-.45.24-.17.04-.34.03-.5-.02-.16-.05-.3-.14-.41-.27-.11-.13-.19-.28-.22-.45l-1.6-5.29-.79 2.63.99 3.35c.05.17.06.34.02.51-.04.17-.13.32-.26.44-.13.12-.28.2-.45.24-.17.04-.34.03-.5-.02-.16-.05-.3-.14-.41-.27-.11-.13-.19-.28-.22-.45l-1.43-4.8c-.33.53-.77.97-1.32 1.28-.54.31-1.16.47-1.78.47z"/>
+                    </svg>
+                    Venmo
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-xs flex items-center justify-center border-[#6D1ED4] text-[#6D1ED4] hover:bg-[#6D1ED4] hover:text-white shadow-sm"
+                    onClick={() => window.open('https://enroll.zellepay.com/qr-codes?data=eyJuYW1lIjoiWUVNSVNJIiwiYWN0aW9uIjoicGF5bWVudCIsInRva2VuIjoiNDQzODI0MTk4MSJ9', '_blank')}
+                  >
+                    <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M19.5 3.5h-15c-1.1 0-2 .9-2 2v13c0 1.1.9 2 2 2h15c1.1 0 2-.9 2-2v-13c0-1.1-.9-2-2-2zm-7.45 13.98c-2.87 0-5.21-2.34-5.21-5.21 0-2.87 2.34-5.21 5.21-5.21 1.25 0 2.4.44 3.3 1.18l-1.35 1.35c-.51-.36-1.13-.57-1.8-.57-1.73 0-3.14 1.41-3.14 3.14 0 1.73 1.41 3.14 3.14 3.14 1.49 0 2.73-1.04 3.05-2.43h-3.05v-1.78h5.08c.06.33.09.67.09 1.02 0 2.87-2.34 5.21-5.21 5.21z"/>
+                    </svg>
+                    Zelle
+                  </Button>
+                </div>
+
                 <Button
                   variant="outline"
-                  className="w-full"
+                  className="w-full mt-2"
                   onClick={clearCart}
                 >
                   Clear Cart
