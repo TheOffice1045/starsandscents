@@ -187,6 +187,7 @@ export function CartSheet() {
                   Clear Cart
                 </Button>
               </div>
+              <div className="pb-6"></div>
             </div>
           )}
         </div>
