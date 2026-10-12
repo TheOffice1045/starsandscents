@@ -12,7 +12,7 @@ const geist = GeistSans({
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isAdminPage = pathname?.startsWith('/admin');
+  const isAdminPage = pathname?.startsWith('/indoorme');
 
   return (
     <div className={isAdminPage ? geist.className : ''}>

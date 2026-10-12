@@ -37,7 +37,7 @@ export function AdminHeader({ className = "" }: { className?: string }) {
 
   return (
     <header className={`bg-white px-6 py-3 flex items-center justify-between border-b ${className}`}>
-      <Link href="/admin" className="h-8 flex items-center gap-3">
+      <Link href="/indoorme" className="h-8 flex items-center gap-3">
         <div className="relative h-8 w-32">
           <Image
             src={settings.logo || '/placeholder.png'}
@@ -142,7 +142,7 @@ export function AdminHeader({ className = "" }: { className?: string }) {
             {notifications.length > 0 && (
               <div className="border-t border-gray-200 bg-gray-50/50 px-4 py-1">
                 <Link 
-                  href="/admin/notifications" 
+                  href="/indoorme/notifications" 
                   className="flex items-center justify-center w-full text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors py-2 rounded-lg hover:bg-gray-0"
                 >
                   View all notifications
@@ -165,20 +165,20 @@ export function AdminHeader({ className = "" }: { className?: string }) {
             <DropdownMenuSeparator />
             
             <DropdownMenuGroup>
-            <Link href="/admin/orders">
+            <Link href="/indoorme/orders">
               <DropdownMenuItem>
                 <ShoppingCart className="mr-2 h-4 w-4" />
                 <span>Orders</span>
               </DropdownMenuItem>
               </Link>
-            <Link href="/admin/products">
+            <Link href="/indoorme/products">
               <DropdownMenuItem>
                 <PackageCheck className="mr-2 h-4 w-4" />
                 <span>Inventory</span>
               </DropdownMenuItem>
               </Link>
             
-              <Link href="/admin/settings">
+              <Link href="/indoorme/settings">
                 <DropdownMenuItem>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>

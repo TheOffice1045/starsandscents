@@ -19,8 +19,8 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Site visibility: when the store is in "coming-soon" mode, send storefront
-  // visitors (including admins) to /coming-soon. /admin stays reachable.
-  if (!pathname.startsWith('/admin')) {
+  // visitors (including admins) to /coming-soon. /indoorme stays reachable.
+  if (!pathname.startsWith('/indoorme')) {
     const isComingSoonPage = pathname === '/coming-soon';
     const isExempt = isComingSoonPage || EXEMPT_PATH_PREFIXES.some(prefix => pathname.startsWith(prefix));
 
@@ -44,7 +44,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Check if we're trying to access the admin section
-  if (pathname.startsWith('/admin')) {
+  if (pathname.startsWith('/indoorme')) {
     // Get the user's session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
