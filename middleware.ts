@@ -16,8 +16,35 @@ export async function middleware(request: NextRequest) {
     }
   );
   
+  const { pathname } = request.nextUrl;
+
+  // Site visibility: when the store is in "coming-soon" mode, send storefront
+  // visitors (including admins) to /coming-soon. /admin stays reachable.
+  if (!pathname.startsWith('/admin')) {
+    const isComingSoonPage = pathname === '/coming-soon';
+    const isExempt = isComingSoonPage || EXEMPT_PATH_PREFIXES.some(prefix => pathname.startsWith(prefix));
+
+    const { data: storeSettings } = await supabase
+      .from('store_settings')
+      .select('site_visibility')
+      .limit(1)
+      .maybeSingle();
+    const isComingSoon = storeSettings?.site_visibility === 'coming-soon';
+
+    if (isComingSoon && !isExempt) {
+      return NextResponse.redirect(new URL('/coming-soon', request.url));
+    }
+
+    // Don't leave visitors stuck on the placeholder once the site is live
+    if (!isComingSoon && isComingSoonPage) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+
+    return NextResponse.next();
+  }
+
   // Check if we're trying to access the admin section
-  if (request.nextUrl.pathname.startsWith('/admin')) {
+  if (pathname.startsWith('/admin')) {
     // Get the user's session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
@@ -77,7 +104,11 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Configure the middleware to run only on admin routes
+// Paths that stay reachable while the site is in "coming-soon" mode
+// (auth flows so admins can sign in, and API routes like webhooks)
+const EXEMPT_PATH_PREFIXES = ['/api', '/signin', '/signup', '/auth', '/reset-password', '/update-password'];
+
+// Run on every page except Next.js internals and static files
 export const config = {
-  matcher: '/admin/:path*',
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?)$).*)'],
 };

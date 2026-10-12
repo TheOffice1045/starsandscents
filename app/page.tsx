@@ -124,8 +124,8 @@ export default function Home() {
           priority
         />
         <div className="absolute inset-0 bg-black/20">
-          <div className="container mx-auto h-full flex items-center justify-end">
-            <div className="text-white max-w-md text-left mr-16">
+          <div className="container mx-auto h-full flex items-center justify-start px-4">
+            <div className="text-white max-w-md text-left ml-16">
               <p className="text-sm uppercase tracking-[0.2em] mb-2">{siteConfig.name}</p>
               {siteConfig.description && (
                 <p className="text-xs opacity-90 mb-4">{siteConfig.description}</p>
