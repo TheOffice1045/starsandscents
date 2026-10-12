@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { DEFAULT_STORE_NAME } from '@/config/site';
 import { ArrowLeft, MoreHorizontal, Loader2, CheckCircle, Truck, CreditCard, FileText, MapPin, Mail, Phone, User, Calendar, Package, DollarSign, ExternalLink, Copy } from "lucide-react";
 import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -221,7 +222,7 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
       }
       
       // Use store info if available, otherwise use fallbacks
-      const storeName = storeInfo?.store_name || 'Your Store Name';
+      const storeName = storeInfo?.store_name || DEFAULT_STORE_NAME;
       const storeAddress = storeInfo?.address || '123 Store Street';
       const storeCity = storeInfo?.city || 'City';
       const storeState = storeInfo?.state || 'State';

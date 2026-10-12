@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { DEFAULT_STORE_NAME } from '@/config/site';
 
 if (!process.env.RESEND_API_KEY) {
   throw new Error('RESEND_API_KEY environment variable is required');
@@ -24,7 +25,7 @@ export const createOrderConfirmationEmail = (
   orderNumber: string,
   orderTotal: number,
   items: Array<{ name: string; quantity: number; price: number }>,
-  storeName: string = 'Candles Store'
+  storeName: string = DEFAULT_STORE_NAME
 ): EmailTemplate => ({
   to: [customerEmail],
   subject: `Order Confirmation #${orderNumber} - ${storeName}`,
@@ -83,7 +84,7 @@ export const createOrderConfirmationEmail = (
 export const createWelcomeEmail = (
   customerEmail: string,
   customerName: string,
-  storeName: string = 'Candles Store'
+  storeName: string = DEFAULT_STORE_NAME
 ): EmailTemplate => ({
   to: [customerEmail],
   subject: `Welcome to ${storeName}!`,
@@ -135,7 +136,7 @@ export const createWelcomeEmail = (
 export const createPasswordResetEmail = (
   customerEmail: string,
   resetToken: string,
-  storeName: string = 'Candles Store'
+  storeName: string = DEFAULT_STORE_NAME
 ): EmailTemplate => ({
   to: [customerEmail],
   subject: `Password Reset - ${storeName}`,
@@ -195,7 +196,7 @@ export const createShippingConfirmationEmail = (
   orderNumber: string,
   trackingNumber: string,
   carrier: string = 'USPS',
-  storeName: string = 'Candles Store'
+  storeName: string = DEFAULT_STORE_NAME
 ): EmailTemplate => ({
   to: [customerEmail],
   subject: `Your order #${orderNumber} has shipped - ${storeName}`,
@@ -255,7 +256,7 @@ export const createContactFormEmail = (
   email: string,
   subject: string,
   message: string,
-  storeName: string = 'Candles Store'
+  storeName: string = DEFAULT_STORE_NAME
 ): EmailTemplate => ({
   to: [DEFAULT_FROM], // Send to store email
   subject: `Contact Form: ${subject} - ${storeName}`,

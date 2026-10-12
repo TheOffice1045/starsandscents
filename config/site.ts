@@ -3,9 +3,12 @@ interface SiteConfig {
   description: string;
 }
 
+// Store name used whenever none is set in Admin → Settings
+export const DEFAULT_STORE_NAME = "Stars And Scents";
+
 // Default static config for fallback
 export const defaultSiteConfig: SiteConfig = {
-  name: "Candles",
+  name: DEFAULT_STORE_NAME,
   description: "Handcrafted with Love"
 };
 

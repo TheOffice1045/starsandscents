@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { DEFAULT_STORE_NAME } from '@/config/site';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { EmailService } from '@/lib/email';
@@ -340,7 +341,7 @@ export async function POST(req: NextRequest) {
               .select('store_name')
               .single();
             
-            const storeName = storeSettings?.store_name || 'Candles Store';
+            const storeName = storeSettings?.store_name || DEFAULT_STORE_NAME;
             
             // Prepare order items for email
             const emailItems = [];

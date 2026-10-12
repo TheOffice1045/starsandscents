@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { DEFAULT_STORE_NAME } from '@/config/site';
 import { useSettingsStore } from "@/lib/store/settings";
 import { createBrowserClient } from "@supabase/ssr";
 import { toast } from "sonner";
@@ -59,7 +60,7 @@ export default function SettingsPage() {
               .from('stores')
               .insert({
                 user_id: user.id,
-                name: 'My Store'
+                name: DEFAULT_STORE_NAME
                 // Removed created_at and updated_at fields
               })
               .select('id')
@@ -84,7 +85,7 @@ export default function SettingsPage() {
               .from('store_settings')
               .insert({
                 store_id: newStore.id,
-                store_name: 'My Store',
+                store_name: DEFAULT_STORE_NAME,
                 store_slogan: '',
                 time_zone: 'America/New_York',
                 auto_dst: true,
@@ -103,7 +104,7 @@ export default function SettingsPage() {
             
             // Update settings state with defaults
             updateSettings({
-              name: 'My Store',
+              name: DEFAULT_STORE_NAME,
               slogan: '',
               timeZone: 'America/New_York',
               autoDST: true,

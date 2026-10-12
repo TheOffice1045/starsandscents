@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { DEFAULT_STORE_NAME } from '@/config/site';
 import { persist } from 'zustand/middleware';
 import { StateCreator } from 'zustand';
 import { createBrowserClient } from '@supabase/ssr';
@@ -65,7 +66,7 @@ const createSettingsStore: StateCreator<SettingsState> = (set) => ({
     currency: 'USD',
     language: 'en',
     notifications: true,
-    name: 'Stars And Scents',
+    name: DEFAULT_STORE_NAME,
     slogan: '',
     logo: '',
     phone: '',
@@ -119,7 +120,7 @@ const createSettingsStore: StateCreator<SettingsState> = (set) => ({
         set((state) => ({
           settings: {
             ...state.settings,
-            name: data.store_name || state.settings.name,
+            name: data.store_name || DEFAULT_STORE_NAME,
             slogan: data.store_slogan || state.settings.slogan,
             logo: data.logo_url || state.settings.logo,
             phone: data.phone || state.settings.phone,
