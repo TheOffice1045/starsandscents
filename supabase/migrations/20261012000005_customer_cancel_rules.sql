@@ -18,11 +18,16 @@ AS $$
     AND sr.name IN ('Owner', 'Admin', 'Manager');
 $$;
 
-REVOKE ALL ON FUNCTION public.notify_store_admins(text, text) FROM PUBLIC;
+-- Supabase grants new functions to anon/authenticated explicitly, so revoking
+-- from PUBLIC alone would still let anyone spam admins through the RPC endpoint.
+REVOKE ALL ON FUNCTION public.notify_store_admins(text, text) FROM PUBLIC, anon, authenticated;
 
+-- SECURITY DEFINER so it can call notify_store_admins(), which customers can't.
+-- auth.uid() still reflects the customer making the change.
 CREATE OR REPLACE FUNCTION public.guard_customer_order_update()
 RETURNS trigger
 LANGUAGE plpgsql
+SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
