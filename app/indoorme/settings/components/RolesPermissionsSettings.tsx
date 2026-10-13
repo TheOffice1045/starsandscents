@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { createBrowserClient } from "@supabase/ssr";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+
 type Role = {
   id: string;
   name: string;
@@ -24,16 +24,15 @@ type Role = {
 };
 
 type StoreUser = {
-  id: string;
+  id: string; // store_users row id
+  user_id: string | null;
   email: string;
-  role: string;
-  role_name: string;
-  invited: boolean;
+  role_id: string | null;
+  role_name: string | null;
   active: boolean;
-  name?: string;
-  avatar_url?: string;
-  last_sign_in_at?: string;
-  created_at?: string;
+  pending: boolean;
+  has_admin_access: boolean;
+  is_self: boolean;
 };
 
 type Permission = {
@@ -43,15 +42,19 @@ type Permission = {
   category: string;
 };
 
-interface User {
-  id: string;
-  email: string;
-  role: string;
+// Admin access is granted by role name (middleware.ts); other roles can't open /indoorme.
+const ADMIN_ROLE_NAMES = ["Owner", "Admin", "Manager"];
+
+async function readJson(response: Response) {
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
+  return body;
 }
 
 export default function RolesPermissionsSettings({ storeId }: { storeId: string | null }) {
   const [roles, setRoles] = useState<Role[]>([]);
   const [users, setUsers] = useState<StoreUser[]>([]);
+  const [isOwner, setIsOwner] = useState(false);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
@@ -59,36 +62,30 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
   const [newRoleDescription, setNewRoleDescription] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserRole, setNewUserRole] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [showAddRoleDialog, setShowAddRoleDialog] = useState(false);
   const [showInviteUserDialog, setShowInviteUserDialog] = useState(false);
-  const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-  // No changes needed to the imports and type definitions
-  
-  // Inside the useEffect where you fetch data
+  const loadUsers = useCallback(async () => {
+    if (!storeId) return;
+    const data = await readJson(await fetch(`/api/admin/users?store_id=${storeId}`));
+    setUsers(data.users);
+    setIsOwner(Boolean(data.me?.is_owner));
+  }, [storeId]);
+
   useEffect(() => {
     if (!storeId) return;
-    
+
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch roles from API
-        const rolesResponse = await fetch(`/api/admin/roles?store_id=${storeId}`);
-        if (!rolesResponse.ok) throw new Error('Failed to fetch roles');
-        let rolesData = await rolesResponse.json();
-        
-        // Check if Owner role exists, if not create it
-        let ownerRoleExists = rolesData.some((role: any) => role.name === 'Owner');
-        
-        if (!ownerRoleExists) {
-          // Get all available permissions
-          const permissionsResponse = await fetch('/api/admin/permissions');
-          if (!permissionsResponse.ok) throw new Error('Failed to fetch permissions');
-          const allPermissions = await permissionsResponse.json();
-          
-          const permissionIds = Object.values(allPermissions).flat().map((p: any) => p.id);
-          
-          // Create Owner role with all permissions
+        const rolesData = await readJson(await fetch(`/api/admin/roles?store_id=${storeId}`));
+        const permissionsData = await readJson(await fetch('/api/admin/permissions'));
+
+        // Every store needs an Owner role; create it (with all permissions) if missing
+        if (!rolesData.some((role: any) => role.name === 'Owner')) {
+          const permissionIds = Object.values(permissionsData).flat().map((p: any) => p.id);
           const createOwnerResponse = await fetch('/api/admin/roles', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -99,59 +96,28 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
               permissions: permissionIds,
             }),
           });
-          
-          if (createOwnerResponse.ok) {
-            const ownerRole = await createOwnerResponse.json();
-            rolesData.push(ownerRole);
-          }
+          if (createOwnerResponse.ok) rolesData.push(await createOwnerResponse.json());
         }
-        
-        // Fetch users
-        const { data: usersData, error: usersError } = await supabase
-          .from('store_users')
-          .select('*, store_roles(name)')
-          .eq('store_id', storeId);
-          
-        if (usersError) throw usersError;
-        
-        // Fetch permissions from API
-        const permissionsResponse = await fetch('/api/admin/permissions');
-        if (!permissionsResponse.ok) throw new Error('Failed to fetch permissions');
-        const permissionsData = await permissionsResponse.json();
-        
-        // Format the data
+
+        await loadUsers();
+
         const formattedRoles = rolesData.map((role: any) => ({
           id: role.id,
           name: role.name,
           description: role.description,
           permissions: Array.isArray(role.permissions) ? role.permissions : [],
         }));
-        
-        const formattedUsers = usersData.map((user: any) => ({
-          id: user.user_id || user.id,
-          email: user.email,
-          role: user.role_id,
-          role_name: user.store_roles?.name || 'Unknown',
-          invited: user.status === 'invited',
-          active: user.status === 'active',
-        }));
-        
-        // Flatten permissions data for easier use
-        const allPermissions = Object.values(permissionsData).flat();
-        const formattedPermissions = allPermissions.map((permission: any) => ({
+
+        const formattedPermissions = Object.values(permissionsData).flat().map((permission: any) => ({
           id: permission.id,
           name: permission.name,
           description: permission.description,
           category: permission.category,
         }));
-        
+
         setRoles(formattedRoles);
-        setUsers(formattedUsers);
         setPermissions(formattedPermissions);
-        
-        if (formattedRoles.length > 0) {
-          setSelectedRole(formattedRoles[0]);
-        }
+        if (formattedRoles.length > 0) setSelectedRole(formattedRoles[0]);
       } catch (error: any) {
         console.error('Error fetching roles and permissions:', error);
         toast.error(`Failed to load roles and permissions: ${error.message}`);
@@ -159,94 +125,105 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
         setLoading(false);
       }
     };
-    
+
     fetchData();
-  }, [storeId, supabase, newUserRole]);
+  }, [storeId, loadUsers]);
 
-  // Fetch roles when the invite dialog is opened
-  useEffect(() => {
-    if (!showInviteUserDialog || !storeId) return;
-    const fetchRoles = async () => {
-      try {
-        const { data: rolesData, error: rolesError } = await supabase
-          .from('store_roles')
-          .select('id, name, description, permissions')
-          .eq('store_id', storeId);
-        if (rolesError) throw rolesError;
-        setRoles(rolesData || []);
-      } catch (error) {
-        console.error('Error fetching roles:', error);
-        toast.error('Failed to load roles');
-      }
-    };
-    fetchRoles();
-  }, [showInviteUserDialog, storeId, supabase]);
+  // Non-owners can't hand out the Owner role
+  const assignableRoles = roles.filter(role => isOwner || role.name !== 'Owner');
+  const roleLabel = (role: Role) =>
+    ADMIN_ROLE_NAMES.includes(role.name) ? role.name : `${role.name} (no admin access)`;
 
-  // Update the handleInviteUser function to ensure it properly uses the selected role
   const handleInviteUser = async () => {
     if (!storeId || !newUserEmail || !newUserRole) {
       toast.error("Please select a role and enter an email address");
       return;
     }
-    
-    console.log("Inviting user with role:", newUserRole); // Debug log
-    
+
+    setInviting(true);
     try {
-      // Check if user already exists
-      const { data: existingUser, error: checkError } = await supabase
-        .from('store_users')
-        .select('*')
-        .eq('store_id', storeId)
-        .eq('email', newUserEmail)
-        .maybeSingle();
-        
-      if (checkError) throw checkError;
-      
-      if (existingUser) {
-        toast.error("User already has access to this store");
-        return;
-      }
-      
-      // Create invitation
-      const { data, error } = await supabase
-        .from('store_users')
-        .insert({
-          store_id: storeId,
-          email: newUserEmail,
-          role_id: newUserRole,
-          status: 'invited',
-          invited_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-        
-      if (error) throw error;
-      
-      // Get role name
-      const role = roles.find(r => r.id === newUserRole);
-      console.log("Found role:", role); // Debug log
-      
-      const newUser: StoreUser = {
-        id: data.user_id || 'pending',
-        email: data.email,
-        role: data.role_id,
-        role_name: role?.name || 'Unknown',
-        invited: true,
-        active: false
-      };
-      
-      setUsers([...users, newUser]);
+      const result = await readJson(await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ store_id: storeId, email: newUserEmail, role_id: newUserRole }),
+      }));
+
+      await loadUsers();
+      toast.success(result.emailed
+        ? `Invitation sent to ${newUserEmail}`
+        : `${newUserEmail} already has an account and was added. They can sign in now.`);
       setNewUserEmail("");
       setNewUserRole("");
       setShowInviteUserDialog(false);
-      
-      // Send invitation email (this would typically be handled by a server function)
-      toast.success(`Invitation sent to ${newUserEmail}`);
     } catch (error: any) {
       console.error('Error inviting user:', error);
       toast.error(`Failed to invite user: ${error.message}`);
+    } finally {
+      setInviting(false);
     }
   };
+
+  // Shared runner for row actions: calls the API, then reloads the list from the server
+  const runUserAction = async (user: StoreUser, request: () => Promise<Response>, success: string) => {
+    setBusyUserId(user.id);
+    try {
+      await readJson(await request());
+      await loadUsers();
+      toast.success(success);
+    } catch (error: any) {
+      console.error('Error updating user:', error);
+      toast.error(error.message);
+    } finally {
+      setBusyUserId(null);
+    }
+  };
+
+  const patchUser = (user: StoreUser, changes: Record<string, unknown>) =>
+    fetch('/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ store_id: storeId, id: user.id, ...changes }),
+    });
+
+  const handleChangeUserRole = (user: StoreUser, newRoleId: string) => {
+    const role = roles.find(r => r.id === newRoleId);
+    if (!role || newRoleId === user.role_id) return;
+    if (!ADMIN_ROLE_NAMES.includes(role.name) &&
+        !confirm(`The ${role.name} role can't open the admin. ${user.email} will lose admin access. Continue?`)) {
+      return;
+    }
+    runUserAction(user, () => patchUser(user, { role_id: newRoleId }), `${user.email} is now ${role.name}`);
+  };
+
+  const handleStatusChange = (user: StoreUser) => {
+    const status = user.active ? 'inactive' : 'active';
+    runUserAction(user, () => patchUser(user, { status }),
+      status === 'active' ? `${user.email} activated` : `${user.email} deactivated`);
+  };
+
+  const handleResendInvite = (user: StoreUser) => {
+    runUserAction(user, () => patchUser(user, { resend: true }), `Sign-in link sent to ${user.email}`);
+  };
+
+  const handleRemoveUser = (user: StoreUser) => {
+    if (!confirm(`Remove ${user.email} from this store? Their login stays, but they lose admin access.`)) return;
+    runUserAction(user, () => fetch(`/api/admin/users?store_id=${storeId}&id=${user.id}`, { method: 'DELETE' }),
+      `${user.email} removed`);
+  };
+
+  const getStatusColor = (user: StoreUser) => {
+    if (!user.active) return 'bg-red-100 text-red-800';
+    return user.pending ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800';
+  };
+
+  const getStatusText = (user: StoreUser) => {
+    if (!user.active) return 'Inactive';
+    return user.pending ? 'Invited' : 'Active';
+  };
+
+  // Owners can only be changed by another Owner; nobody edits their own row
+  const canEdit = (user: StoreUser) => !user.is_self && (isOwner || user.role_name !== 'Owner');
+
 
   const handleTogglePermission = async (permissionId: string) => {
     if (!selectedRole) return;
@@ -279,30 +256,6 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
     } catch (error: any) {
       console.error('Error updating permissions:', error);
       toast.error(`Failed to update permissions: ${error.message}`);
-    }
-  };
-
-  const handleRemoveUser = async (userId: string, email: string) => {
-    if (!storeId) return;
-    
-    if (!confirm(`Are you sure you want to remove ${email} from this store?`)) {
-      return;
-    }
-    
-    try {
-      const { error } = await supabase
-        .from('store_users')
-        .delete()
-        .eq('store_id', storeId)
-        .eq('user_id', userId);
-        
-      if (error) throw error;
-      
-      setUsers(users.filter(user => user.id !== userId));
-      toast.success(`${email} removed successfully`);
-    } catch (error: any) {
-      console.error('Error removing user:', error);
-      toast.error(`Failed to remove user: ${error.message}`);
     }
   };
 
@@ -381,176 +334,6 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
     }
   };
 
-  // Add a new function to handle user activation/deactivation
-  const handleStatusChange = async (userId: string, newStatus: 'active' | 'inactive' | 'invited') => {
-    try {
-      // Update the user's status in the database
-      const { error } = await supabase
-        .from('store_users')
-        .update({ 
-          status: newStatus === 'invited' ? 'pending' : newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-
-      if (error) throw error;
-
-      // Update the local state
-      setUsers(users.map(user => 
-        user.id === userId 
-          ? { 
-              ...user, 
-              invited: newStatus === 'invited',
-              active: newStatus === 'active'
-            } 
-          : user
-      ));
-
-      toast.success('User status updated successfully');
-    } catch (error) {
-      console.error('Error updating user status:', error);
-      toast.error('Failed to update user status');
-    }
-  };
-
-  // Update the User type to include active status
-  // (This is just for reference - you'll need to update the type definition at the top of the file)
-  // type User = {
-  //   id: string;
-  //   email: string;
-  //   role: string;
-  //   role_name: string;
-  //   invited: boolean;
-  //   active?: boolean;
-  // };
-
-  // Then update the users table to include the activation toggle
-  // In the TableRow for users:
-
-  // Add this function after handleToggleUserStatus
-  const handleAcceptInvitation = async (userId: string, email: string) => {
-    if (!storeId) return;
-    
-    try {
-      console.log("Accepting invitation for user:", userId, email);
-      
-      // First, check if we're using the correct column name
-      const { data: userData, error: userError } = await supabase
-        .from('store_users')
-        .select('*')
-        .eq('store_id', storeId)
-        .eq('email', email)
-        .single();
-        
-      if (userError) {
-        console.error("Error finding user:", userError);
-        throw userError;
-      }
-      
-      console.log("Found user data:", userData);
-      
-      // Update the status to 'active' and clear the invited_at field
-      const { error } = await supabase
-        .from('store_users')
-        .update({ 
-          status: 'active',
-          invited_at: null
-        })
-        .eq('store_id', storeId)
-        .eq('email', email);  // Use email instead of user_id as it might be more reliable
-        
-      if (error) throw error;
-      
-      // Try to update the accepted_at field separately
-      try {
-        await supabase
-          .from('store_users')
-          .update({ 
-            accepted_at: new Date().toISOString()
-          })
-          .eq('store_id', storeId)
-          .eq('email', email);
-      } catch (acceptedAtError) {
-        console.warn('Could not update accepted_at, column may not exist yet:', acceptedAtError);
-      }
-      
-      // Update local state - use a functional update to avoid stale closures
-      setUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.id === userId 
-            ? { ...user, invited: false, active: true } 
-            : user
-        )
-      );
-      
-      toast.success(`Invitation accepted for ${email}`);
-    } catch (error: any) {
-      console.error('Error accepting invitation:', error);
-      toast.error(`Failed to accept invitation: ${error.message}`);
-    }
-  };
-
-  // Add this function after handleRemoveUser
-  // Update the handleChangeUserRole function
-  const handleChangeUserRole = async (userId: string, email: string, newRoleId: string) => {
-    if (!storeId) return;
-    
-    try {
-      // Find the role name for display purposes
-      const role = roles.find(r => r.id === newRoleId);
-      if (!role) {
-        throw new Error("Selected role not found");
-      }
-      
-      // Check if this is the last Owner
-      const currentRole = roles.find(r => r.id === users.find(u => u.id === userId)?.role);
-      if (currentRole?.name === 'Owner') {
-        // Count how many owners we have
-        const ownerCount = users.filter(u => {
-          const userRole = roles.find(r => r.id === u.role);
-          return userRole?.name === 'Owner';
-        }).length;
-        
-        if (ownerCount <= 1 && role.name !== 'Owner') {
-          toast.error("Cannot remove the last Owner. Please assign another Owner first.");
-          return;
-        }
-      }
-      
-      // Update the user's role in the database
-      const { error } = await supabase
-        .from('store_users')
-        .update({ role_id: newRoleId })
-        .eq('store_id', storeId)
-        .eq('user_id', userId);
-        
-      if (error) throw error;
-      
-      // Update local state
-      setUsers(users.map(user => 
-        user.id === userId 
-          ? { ...user, role: newRoleId, role_name: role.name } 
-          : user
-      ));
-      
-      toast.success(`${email}'s role updated to ${role.name}`);
-    } catch (error: any) {
-      console.error('Error updating user role:', error);
-      toast.error(`Failed to update role: ${error.message}`);
-    }
-  };
-
-  // Update the status comparison
-  const getStatusColor = (user: StoreUser) => {
-    if (user.invited) return 'bg-yellow-100 text-yellow-800';
-    return user.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-  };
-
-  const getStatusText = (user: StoreUser) => {
-    if (user.invited) return 'Invited';
-    return user.active ? 'Active' : 'Inactive';
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -569,7 +352,12 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
         
         <TabsContent value="users" className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-medium">Store Users</h2>
+            <div>
+              <h2 className="text-xl font-medium">Store Users</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                Owner and Admin can use the whole admin. Manager can use everything except Settings and Finance. Other roles can&apos;t sign in to the admin.
+              </p>
+            </div>
             <Dialog open={showInviteUserDialog} onOpenChange={setShowInviteUserDialog}>
               <DialogTrigger asChild>
                 <AdminButton size="sm">
@@ -604,7 +392,7 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
                           required
                         />
                       </div>
-                      <p className="text-xs text-gray-500">They&apos;ll receive an email invitation to join this store.</p>
+                      <p className="text-xs text-gray-500">They&apos;ll get an email to set a password. If they already have an account, they&apos;re added straight away.</p>
                     </div>
                     
                     <div className="space-y-2">
@@ -612,19 +400,16 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
                       <div className="relative">
                         <Select 
                           value={newUserRole} 
-                          onValueChange={(value) => {
-                            console.log("Selected role ID:", value);
-                            setNewUserRole(value);
-                          }}
+                          onValueChange={setNewUserRole}
                         >
                           <SelectTrigger id="invite-role" className="w-full bg-white">
                             <SelectValue placeholder="Select a role" />
                           </SelectTrigger>
                           <SelectContent position="popper" className="z-[9999] w-full min-w-[200px]" sideOffset={5}>
-                            {roles.length > 0 ? (
-                              roles.map((role) => (
+                            {assignableRoles.length > 0 ? (
+                              assignableRoles.map((role) => (
                                 <SelectItem key={role.id} value={role.id} className="cursor-pointer">
-                                  {role.name}
+                                  {roleLabel(role)}
                                 </SelectItem>
                               ))
                             ) : (
@@ -653,11 +438,11 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
                     </Button>
                     <Button 
                       type="submit"
-                      disabled={!newUserEmail || !newUserRole}
+                      disabled={!newUserEmail || !newUserRole || inviting}
                       className="flex items-center"
                     >
                       <Mail className="mr-2 h-4 w-4" />
-                      Send Invitation
+                      {inviting ? "Sending..." : "Send Invitation"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -686,21 +471,32 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
                   ) : (
                     users.map((user) => (
                       <TableRow key={user.id} className="group">
-                        <TableCell className="font-medium">{user.email}</TableCell>
+                        <TableCell className="font-medium">
+                          {user.email}
+                          {user.is_self && <span className="ml-2 text-xs text-muted-foreground">(you)</span>}
+                          {user.active && !user.has_admin_access && (
+                            <p className="text-xs font-normal text-orange-600 mt-0.5">
+                              {user.role_name ? `${user.role_name} role can't open the admin` : 'No role assigned'}
+                            </p>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Select
-                            value={user.role}
-                            onValueChange={(newRoleId) => handleChangeUserRole(user.id, user.email, newRoleId)}
+                            value={user.role_id ?? undefined}
+                            onValueChange={(newRoleId) => handleChangeUserRole(user, newRoleId)}
+                            disabled={!canEdit(user) || busyUserId === user.id}
                           >
-                            <SelectTrigger className="w-[180px] bg-transparent">
+                            <SelectTrigger className="w-[220px] bg-transparent">
                               <SelectValue placeholder="Select role" />
                             </SelectTrigger>
                             <SelectContent>
-                              {roles.map((role) => (
-                                <SelectItem key={role.id} value={role.id} className="cursor-pointer">
-                                  {role.name}
-                                </SelectItem>
-                              ))}
+                              {roles
+                                .filter(role => isOwner || role.name !== 'Owner' || role.id === user.role_id)
+                                .map((role) => (
+                                  <SelectItem key={role.id} value={role.id} className="cursor-pointer">
+                                    {roleLabel(role)}
+                                  </SelectItem>
+                                ))}
                             </SelectContent>
                           </Select>
                         </TableCell>
@@ -710,49 +506,43 @@ export default function RolesPermissionsSettings({ storeId }: { storeId: string 
                           </span>
                         </TableCell>
                         <TableCell className="text-right p-0 pr-2">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-70 group-hover:opacity-100">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-[160px]">
-                              {user.invited && (
-                                <DropdownMenuItem
-                                  onClick={() => handleAcceptInvitation(user.id, user.email)}
-                                  className="cursor-pointer"
-                                >
-                                  <Check className="mr-2 h-4 w-4 text-green-500" />
-                                  <span>Accept Invitation</span>
-                                </DropdownMenuItem>
-                              )}
-                              {!user.invited && (
-                                <DropdownMenuItem
-                                  onClick={() => handleStatusChange(user.id, user.active === false ? 'active' : 'inactive')}
-                                  className="cursor-pointer"
-                                >
-                                  {user.active === false ? (
-                                    <>
-                                      <Check className="mr-2 h-4 w-4 text-green-500" />
-                                      <span>Activate</span>
-                                    </>
-                                  ) : (
+                          {canEdit(user) && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-70 group-hover:opacity-100" disabled={busyUserId === user.id}>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-[180px]">
+                                {user.pending && user.active && (
+                                  <DropdownMenuItem onClick={() => handleResendInvite(user)} className="cursor-pointer">
+                                    <Mail className="mr-2 h-4 w-4" />
+                                    <span>Resend invite</span>
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem onClick={() => handleStatusChange(user)} className="cursor-pointer">
+                                  {user.active ? (
                                     <>
                                       <X className="mr-2 h-4 w-4 text-orange-500" />
                                       <span>Deactivate</span>
                                     </>
+                                  ) : (
+                                    <>
+                                      <Check className="mr-2 h-4 w-4 text-green-500" />
+                                      <span>Activate</span>
+                                    </>
                                   )}
                                 </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem 
-                                onClick={() => handleRemoveUser(user.id, user.email)}
-                                className="cursor-pointer text-red-600 focus:text-red-600"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                <span>Remove</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                <DropdownMenuItem
+                                  onClick={() => handleRemoveUser(user)}
+                                  className="cursor-pointer text-red-600 focus:text-red-600"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  <span>Remove</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))

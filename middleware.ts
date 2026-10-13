@@ -46,17 +46,17 @@ export async function middleware(request: NextRequest) {
   // Check if we're trying to access the admin section
   if (pathname.startsWith('/indoorme')) {
     // Get the user's session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    // If no session, redirect to login
-    if (!session || sessionError) {
+    // getUser() verifies the token with Supabase; getSession() would trust the cookie as-is.
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    // If not signed in, redirect to login
+    if (!user || userError) {
       const redirectUrl = new URL('/signin', request.url);
       redirectUrl.searchParams.set('redirect', request.nextUrl.pathname);
       return NextResponse.redirect(redirectUrl);
     }
 
-    // Get the user ID from the session
-    const userId = session.user.id;
+    const userId = user.id;
     
     // Extract store ID from the URL or query parameters
     // For now, we'll check if the user has any admin access to any store
@@ -74,35 +74,51 @@ export async function middleware(request: NextRequest) {
       .eq('user_id', userId)
       .eq('status', 'active');
 
+    // Fail closed: if the role lookup errors for any reason, nobody gets in.
     if (storeUsersError) {
       console.error('Error checking store users:', storeUsersError);
-      // If it's a relation error, the tables might not be set up - allow access for setup
-      if (storeUsersError.code === 'PGRST200' || storeUsersError.message?.includes('relation')) {
-        return NextResponse.next();
-      }
       const redirectUrl = new URL('/signin', request.url);
       redirectUrl.searchParams.set('error', 'access_denied');
       return NextResponse.redirect(redirectUrl);
     }
 
-    // Check if user has any active admin role
-    const hasAdminAccess = storeUsers && storeUsers.length > 0 &&
-      storeUsers.some(user => {
-        const role = user.role as any;
-        return role && (role.name === 'Owner' || role.name === 'Admin' || role.name === 'Manager');
-      });
+    const roleNames = (storeUsers ?? [])
+      .map(user => (user.role as any)?.name as string | undefined)
+      .filter(Boolean) as string[];
 
-    if (!hasAdminAccess) {
+    if (!roleNames.some(name => ADMIN_ROLES.includes(name))) {
       // User is authenticated but doesn't have admin access
       const redirectUrl = new URL('/', request.url);
       redirectUrl.searchParams.set('error', 'insufficient_permissions');
       return NextResponse.redirect(redirectUrl);
+    }
+
+    // Managers run day-to-day operations; settings, roles and finance are Owner/Admin only.
+    const isOwnerOrAdmin = roleNames.some(name => name === 'Owner' || name === 'Admin');
+    if (!isOwnerOrAdmin && OWNER_ADMIN_PATHS.some(prefix => pathname.startsWith(prefix))) {
+      const redirectUrl = new URL('/indoorme', request.url);
+      redirectUrl.searchParams.set('error', 'insufficient_permissions');
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    // 2FA: anyone who has enrolled an authenticator must verify it this session.
+    if (pathname !== MFA_PATH) {
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+        const redirectUrl = new URL(MFA_PATH, request.url);
+        redirectUrl.searchParams.set('redirect', pathname);
+        return NextResponse.redirect(redirectUrl);
+      }
     }
   }
   
   // Continue the request for non-admin routes or authorized users
   return NextResponse.next();
 }
+
+const ADMIN_ROLES = ['Owner', 'Admin', 'Manager'];
+const OWNER_ADMIN_PATHS = ['/indoorme/settings', '/indoorme/finance'];
+const MFA_PATH = '/indoorme/mfa';
 
 // Paths that stay reachable while the site is in "coming-soon" mode
 // (auth flows so admins can sign in, and API routes like webhooks)

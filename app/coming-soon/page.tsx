@@ -24,10 +24,10 @@ export default async function ComingSoonPage() {
       />
       <div className="absolute inset-0 bg-white/80" />
 
-      <div className="relative max-w-md w-full text-center">
-        <div className="mb-8">
+      <div className="relative max-w-md w-full aspect-square flex flex-col items-center justify-center text-center bg-white px-6 md:px-10">
+        <div className="mb-4">
           {logoUrl ? (
-            <div className="mx-auto w-56 h-56 md:w-72 md:h-72 relative">
+            <div className="mx-auto w-56 h-36 md:w-72 md:h-48 relative">
               <Image 
                 src={logoUrl} 
                 alt="Store Logo" 
@@ -43,10 +43,10 @@ export default async function ComingSoonPage() {
           )}
         </div>
         
-        <h1 className="text-4xl font-bold mb-4 text-black">We&apos;ll Be Right Back </h1>
-        
+        <h1 className="text-3xl md:text-4xl font-bold mb-4 text-black">We&apos;ll Be Right Back</h1>
+
         <p className="text-gray-800">
-          We&apos;re working on something amazing. Our online store will be launching soon!
+          Our site is currently undergoing scheduled maintenance. Thank you for your patience, we&apos;ll be back shortly.
         </p>
         
       </div>

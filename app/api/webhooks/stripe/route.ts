@@ -3,6 +3,7 @@ import { DEFAULT_STORE_NAME } from '@/config/site';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { EmailService } from '@/lib/email';
+import { notifyAdmins } from '@/lib/notifications-server';
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
       // Retrieve the session with line items
         console.log('Retrieving expanded session details...');
       const expandedSession = await stripe.checkout.sessions.retrieve(session.id, {
-          expand: ['line_items', 'customer_details', 'line_items.data.price.product']
+          expand: ['line_items', 'customer_details', 'line_items.data.price.product', 'shipping_cost.shipping_rate']
         });
 
         console.log('Session details:', {
@@ -145,6 +146,22 @@ export async function POST(req: NextRequest) {
         }
         
         console.log('Order created successfully:', order.id);
+
+        // Record which shipping option the customer picked (Standard / Express /
+        // Local Pickup). Kept separate from the insert so a schema mismatch can
+        // never block order creation.
+        const shippingRate = expandedSession.shipping_cost?.shipping_rate;
+        const shippingMethodName =
+          shippingRate && typeof shippingRate !== 'string' ? shippingRate.display_name : null;
+        if (shippingMethodName) {
+          const { error: shippingMethodError } = await supabase
+            .from('orders')
+            .update({ shipping_method: shippingMethodName })
+            .eq('id', order.id);
+          if (shippingMethodError) {
+            console.error('Error saving shipping method on order:', shippingMethodError);
+          }
+        }
         
         // Track coupon usage if coupon was applied
         if (couponId && couponCode && discountAmount > 0) {
@@ -330,6 +347,21 @@ export async function POST(req: NextRequest) {
           console.error('Error creating order history:', historyError);
         }
         
+        // Let the store admins know in the admin Notifications page
+        const orderLabel = order.order_number ? `#${order.order_number}` : order.id;
+        await notifyAdmins(
+          supabase,
+          'New Order',
+          `${expandedSession.customer_details?.name || 'A customer'} placed order ${orderLabel} for $${Number(order.total ?? 0).toFixed(2)}.`
+        );
+        if (couponId && couponCode && discountAmount > 0) {
+          await notifyAdmins(
+            supabase,
+            'Coupon Used',
+            `Coupon ${couponCode} was used on order ${orderLabel} (-$${discountAmount.toFixed(2)}).`
+          );
+        }
+
         // Send order confirmation email
         console.log('Sending order confirmation email...');
         try {
@@ -433,6 +465,104 @@ export async function POST(req: NextRequest) {
           { error: 'Error processing payment intent' },
           { status: 500 }
         );
+    }
+  }
+
+
+  // Refunds issued from the Stripe dashboard (or by our own refund API, which has
+  // already recorded them). amount_refunded is cumulative, so taking the larger
+  // value makes this idempotent and never double-counts.
+  else if (event.type === 'charge.refunded') {
+    const charge = event.data.object as Stripe.Charge;
+    const paymentIntentId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
+
+    if (!paymentIntentId) {
+      return NextResponse.json({ received: true });
+    }
+
+    try {
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('id, order_number, total, payment_status, refunded_amount')
+        .eq('payment_intent_id', paymentIntentId)
+        .maybeSingle();
+
+      if (orderError) throw orderError;
+      if (!order) {
+        console.log(`charge.refunded: no order for payment intent ${paymentIntentId}`);
+        return NextResponse.json({ received: true });
+      }
+
+      const recordedCents = Math.round(Number(order.refunded_amount || 0) * 100);
+      const totalCents = Math.round(Number(order.total || 0) * 100);
+      const stripeRefundedCents = Math.min(charge.amount_refunded, totalCents);
+
+      if (stripeRefundedCents > recordedCents) {
+        const newStatus = stripeRefundedCents >= totalCents ? 'refunded' : 'partially_refunded';
+        const { error: updateError } = await supabase
+          .from('orders')
+          .update({
+            refunded_amount: stripeRefundedCents / 100,
+            payment_status: newStatus,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', order.id);
+        if (updateError) throw updateError;
+
+        await supabase.from('order_history').insert({
+          order_id: order.id,
+          status_from: order.payment_status,
+          status_to: newStatus,
+          notes: `Refund of $${((stripeRefundedCents - recordedCents) / 100).toFixed(2)} synced from Stripe (charge ${charge.id})`,
+        });
+
+        await notifyAdmins(
+          supabase,
+          'Order Refunded',
+          `Stripe refunded $${((stripeRefundedCents - recordedCents) / 100).toFixed(2)} on order ${order.order_number ? `#${order.order_number}` : order.id}.`
+        );
+      }
+
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      console.error('Error syncing Stripe refund:', error);
+      return NextResponse.json({ error: 'Error syncing refund' }, { status: 500 });
+    }
+  }
+
+  // Checkouts the customer started but never paid: shown on the admin
+  // Abandoned Carts page. Stripe sends this when a session expires (24h by default).
+  else if (event.type === 'checkout.session.expired') {
+    const session = event.data.object as Stripe.Checkout.Session;
+
+    try {
+      const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 100 });
+
+      const { error } = await supabase
+        .from('abandoned_checkouts')
+        .upsert(
+          {
+            stripe_session_id: session.id,
+            customer_email: session.customer_details?.email ?? session.customer_email ?? null,
+            customer_name: session.customer_details?.name ?? null,
+            amount_total: session.amount_total ? session.amount_total / 100 : 0,
+            currency: session.currency ?? 'usd',
+            items: lineItems.data.map((item) => ({
+              name: item.description,
+              quantity: item.quantity ?? 1,
+              amount: item.amount_total ? item.amount_total / 100 : 0,
+            })),
+            started_at: new Date(session.created * 1000).toISOString(),
+            expired_at: new Date().toISOString(),
+          },
+          { onConflict: 'stripe_session_id' }
+        );
+
+      if (error) throw error;
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      console.error('Error recording abandoned checkout:', error);
+      return NextResponse.json({ error: 'Error recording abandoned checkout' }, { status: 500 });
     }
   }
   

@@ -239,20 +239,34 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
   };
 
   const checkUserReview = useCallback(async () => {
-    if (!user) return;
+    if (!user?.email) return;
     
     try {
+      // Reviews are saved against the customer record, which is matched by email
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('email', user.email)
+        .maybeSingle();
+
+      if (!customer) {
+        setUserHasReviewed(false);
+        setUserExistingReview(null);
+        return;
+      }
+
       const { data: existingReview } = await supabase
-        .from('reviews')
+        .from('product_reviews')
         .select('*')
         .eq('product_id', productId)
-        .eq('user_id', user.id)
-        .single();
+        .eq('customer_id', customer.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (existingReview) {
-        setUserReview(existingReview);
-        setUserRating(existingReview.rating);
         setUserReviewTitle(existingReview.title || "");
+        setUserRating(existingReview.rating || 0);
         setUserHasReviewed(true);
         setUserExistingReview(existingReview);
       } else {

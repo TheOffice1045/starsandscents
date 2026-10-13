@@ -75,8 +75,9 @@ export const useCollectionStore = create<CollectionStore>()(
           try {
             const updatedCollections = await Promise.all(
               collections.map(async (collection) => {
-                const { count, error } = await supabase
-                  .from('collection_products')
+                // A product belongs to a collection through products.collection_id
+                const { count } = await supabase
+                  .from('products')
                   .select('*', { count: 'exact', head: true })
                   .eq('collection_id', collection.id);
                 
@@ -157,10 +158,10 @@ export const useCollectionStore = create<CollectionStore>()(
         
         deleteCollection: async (id) => {
           try {
-            // First delete all collection_products relationships
+            // Products keep existing; they just stop belonging to this collection
             const { error: relError } = await supabase
-              .from('collection_products')
-              .delete()
+              .from('products')
+              .update({ collection_id: null })
               .eq('collection_id', id);
             
             if (relError) throw relError;

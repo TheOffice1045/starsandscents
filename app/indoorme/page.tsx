@@ -1,5 +1,8 @@
 "use client";
 
+import { netRevenue, PAID_STATUSES } from '@/lib/revenue';
+import { toast } from "sonner";
+
 import {
   Card,
   CardContent,
@@ -183,8 +186,8 @@ export default function AdminOverviewPage() {
         // --- Stat Calculations ---
 
         // Revenue
-        const totalRevenue = periodOrdersData.reduce((sum, order) => sum + (order.total || 0), 0);
-        const previousTotalRevenue = previousPeriodOrdersData.reduce((sum, order) => sum + (order.total || 0), 0);
+        const totalRevenue = periodOrdersData.reduce((sum, order) => sum + netRevenue(order), 0);
+        const previousTotalRevenue = previousPeriodOrdersData.reduce((sum, order) => sum + netRevenue(order), 0);
         const revenuePercentageChange = previousTotalRevenue > 0
           ? ((totalRevenue - previousTotalRevenue) / previousTotalRevenue) * 100
           : totalRevenue > 0 ? -999 : 0;
@@ -312,7 +315,7 @@ export default function AdminOverviewPage() {
           }
           
           if (chartDataObj[dataKey]) {
-            chartDataObj[dataKey].revenue += order.total || 0;
+            chartDataObj[dataKey].revenue += netRevenue(order);
             chartDataObj[dataKey].orders += 1;
           }
         });
@@ -323,98 +326,42 @@ export default function AdminOverviewPage() {
         setSalesChartData(salesChartArray);
         
         // Fetch top products by sales - updating this section
-        let topProductsArray = []; // Define this variable in the outer scope
+        let topProductsArray: { name: string; sales: number; revenue: number }[] = [];
         
         try {
-          // Skip the order_items table query since it's causing errors
-          console.log('Fetching products from orders table directly');
-          
-          const { data: ordersWithProducts, error: ordersWithProductsError } = await supabase
-            .from('orders')
-            .select('id, items, line_items');
-            
-          if (ordersWithProductsError) {
-            console.error('Error fetching orders with products:', ordersWithProductsError);
-            // Don't throw the error, just log it and continue
-          }
-          
-          // Process orders with products
-          const productSales: Record<string, any> = {};
-          
-          if (ordersWithProducts && ordersWithProducts.length > 0) {
-            console.log('Orders with products found:', ordersWithProducts.length);
-            
-            ordersWithProducts.forEach(order => {
-              let items = [];
-              
-              // Try to get items from line_items first, then items
-              try {
-                if (order.line_items) {
-                  if (typeof order.line_items === 'string') {
-                    items = JSON.parse(order.line_items);
-                  } else if (Array.isArray(order.line_items)) {
-                    items = order.line_items;
-                  }
-                } else if (order.items) {
-                  if (typeof order.items === 'string') {
-                    items = JSON.parse(order.items);
-                  } else if (Array.isArray(order.items)) {
-                    items = order.items;
-                  }
-                }
-              } catch (e) {
-                console.error('Error parsing order items:', e);
-                // Continue with next order
+          // Best sellers in the selected period, from paid orders only.
+          const { data: soldItems, error: soldItemsError } = await supabase
+            .from('order_items')
+            .select('product_name, quantity, price, status, orders!inner(payment_status, created_at)')
+            .in('orders.payment_status', PAID_STATUSES)
+            .gte('orders.created_at', startDateStr)
+            .lte('orders.created_at', endDateStr);
+
+          if (soldItemsError) throw soldItemsError;
+
+          const productSales: Record<string, { name: string; sales: number; revenue: number }> = {};
+          (soldItems ?? [])
+            .filter((item: any) => item.status !== 'cancelled')
+            .forEach((item: any) => {
+              const productName = item.product_name || 'Unknown Product';
+              const quantity = Number(item.quantity) || 1;
+              const price = Number(item.price) || 0;
+              if (!productSales[productName]) {
+                productSales[productName] = { name: productName, sales: 0, revenue: 0 };
               }
-              
-              if (items && items.length > 0) {
-                console.log('Found items in order:', items.length);
-                
-                items.forEach((item: any) => {
-                  const productName = item.name || item.product_name || item.title || 'Unknown Product';
-                  const price = parseFloat(item.price || item.unit_price || item.unit_amount || 0);
-                  const quantity = parseInt(item.quantity || 1);
-                  
-                  if (!productSales[productName]) {
-                    productSales[productName] = {
-                      name: productName,
-                      sales: 0,
-                      revenue: 0
-                    };
-                  }
-                  
-                  productSales[productName].sales += quantity;
-                  productSales[productName].revenue += price * quantity;
-                });
-              }
+              productSales[productName].sales += quantity;
+              productSales[productName].revenue += price * quantity;
             });
-          }
-          
-          // If we didn't find any products, create some sample data
-          if (Object.keys(productSales).length === 0) {
-            console.log('No product data found, using sample data');
-            
-            // Sample product data
-            productSales['Lavender Candle'] = { name: 'Lavender Candle', sales: 24, revenue: 480 };
-            productSales['Vanilla Bean'] = { name: 'Vanilla Bean', sales: 18, revenue: 360 };
-            productSales['Ocean Breeze'] = { name: 'Ocean Breeze', sales: 15, revenue: 300 };
-            productSales['Cinnamon Spice'] = { name: 'Cinnamon Spice', sales: 12, revenue: 240 };
-          }
-          
+
           topProductsArray = Object.values(productSales)
             .sort((a, b) => b.revenue - a.revenue)
             .slice(0, 4);
             
         } catch (productError) {
-          console.error('Error processing product data:', productError);
-          
-          // Fallback to sample data if everything fails
-          topProductsArray = [
-            { name: 'Lavender Candle', sales: 24, revenue: 480 },
-            { name: 'Vanilla Bean', sales: 18, revenue: 360 },
-            { name: 'Ocean Breeze', sales: 15, revenue: 300 },
-            { name: 'Cinnamon Spice', sales: 12, revenue: 240 }
-          ];
+          // Show an empty list rather than made-up numbers
+          console.error('Error loading top products:', productError);
+          toast.error('Could not load top products');
+          topProductsArray = [];
         }
         
         // Set top products here, after all the processing

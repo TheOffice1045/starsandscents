@@ -33,7 +33,8 @@ export default function FAQPage() {
             <div className="border-b pb-4">
               <h3 className="font-semibold mb-2">How long does shipping take?</h3>
               <p className="text-muted-foreground">
-                Standard shipping takes 5-7 business days. Express shipping is available for 2-3 business day delivery.
+                Delivery time depends on the shipping method you choose at checkout. See our{' '}
+                <a href="/shipping" className="underline">Shipping page</a> for current options, rates and delivery times.
               </p>
             </div>
             <div className="border-b pb-4">
