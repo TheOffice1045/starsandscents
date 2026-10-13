@@ -79,9 +79,9 @@ ALTER TABLE public.billing_addresses     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.order_history         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.collections           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.collection_products   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_channels        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.product_sales_channels ENABLE ROW LEVEL SECURITY;
+-- collection_products and product_sales_channels don't exist in every database
+-- (the live project has neither); they are secured further down only if present.
 
 -- ---------------------------------------------------------------------------
 -- Orders
@@ -231,28 +231,37 @@ CREATE POLICY "Admins manage collections"
   USING (public.is_store_admin())
   WITH CHECK (public.is_store_admin());
 
-CREATE POLICY "Public reads collection products"
-  ON public.collection_products FOR SELECT
-  TO anon, authenticated
-  USING (true);
-
-CREATE POLICY "Admins manage collection products"
-  ON public.collection_products FOR ALL
-  TO authenticated
-  USING (public.is_store_admin())
-  WITH CHECK (public.is_store_admin());
-
 CREATE POLICY "Admins manage sales channels"
   ON public.sales_channels FOR ALL
   TO authenticated
   USING (public.is_store_admin())
   WITH CHECK (public.is_store_admin());
 
-CREATE POLICY "Admins manage product sales channels"
-  ON public.product_sales_channels FOR ALL
-  TO authenticated
-  USING (public.is_store_admin())
-  WITH CHECK (public.is_store_admin());
+-- Optional join tables: secure them only where they exist.
+DO $$
+BEGIN
+  IF to_regclass('public.collection_products') IS NOT NULL THEN
+    ALTER TABLE public.collection_products ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY "Public reads collection products"
+      ON public.collection_products FOR SELECT
+      TO anon, authenticated
+      USING (true);
+    CREATE POLICY "Admins manage collection products"
+      ON public.collection_products FOR ALL
+      TO authenticated
+      USING (public.is_store_admin())
+      WITH CHECK (public.is_store_admin());
+  END IF;
+
+  IF to_regclass('public.product_sales_channels') IS NOT NULL THEN
+    ALTER TABLE public.product_sales_channels ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY "Admins manage product sales channels"
+      ON public.product_sales_channels FOR ALL
+      TO authenticated
+      USING (public.is_store_admin())
+      WITH CHECK (public.is_store_admin());
+  END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- Not covered here (no migration defines them, so their live policies are
