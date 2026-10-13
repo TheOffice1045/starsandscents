@@ -43,10 +43,10 @@ export default async function ComingSoonPage() {
           )}
         </div>
         
-        <h1 className="text-3xl md:text-4xl font-bold mb-4 text-black">We&apos;ll Be Right Back </h1>
-        
+        <h1 className="text-3xl md:text-4xl font-bold mb-4 text-black">We&apos;ll Be Right Back</h1>
+
         <p className="text-gray-800">
-          We&apos;re working on something amazing. Our online store will be launching soon!
+          Our site is currently undergoing scheduled maintenance. Thank you for your patience, we&apos;ll be back shortly.
         </p>
         
       </div>
