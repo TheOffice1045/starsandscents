@@ -3,12 +3,15 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNotificationStore } from '@/lib/store/notifications';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
-import { Bell, Archive, Mail, MailOpen, BellRing, ShoppingCart, UserPlus, Tag, Inbox, Clock } from 'lucide-react';
+import { Bell, Archive, Mail, MailOpen, BellRing, ShoppingCart, UserPlus, Tag, Inbox, Clock, RotateCcw, XCircle, MessageSquare } from 'lucide-react';
 
 const iconMap: { [key: string]: React.ElementType } = {
   'New Order': ShoppingCart,
   'New Customer': UserPlus,
   'Coupon Used': Tag,
+  'Order Refunded': RotateCcw,
+  'Order Cancelled': XCircle,
+  'New Message': MessageSquare,
   'Default': BellRing,
 };
 

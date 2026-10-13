@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logError } from '@/lib/utils';
+import { requireAdmin } from '@/lib/admin-auth';
 
 export async function POST(req: Request) {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth.response;
+
   const supabase = createClient();
   const { userId, title, message } = await req.json();
 

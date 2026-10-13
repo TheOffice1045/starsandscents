@@ -3,7 +3,7 @@
 import { Inter as GeistSans } from 'next/font/google';
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, ShoppingCart, Package, Users, DollarSign, Settings, ChevronDown, ChevronRight, Home, FolderOpen, BoxesIcon, ClipboardCheck, ClipboardList, PackageCheck, Store, TicketPercent, Wallet, Bell } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Package, Users, DollarSign, Settings, ChevronDown, ChevronRight, Home, FolderOpen, BoxesIcon, ClipboardCheck, ClipboardList, PackageCheck, Store, TicketPercent, Wallet, Bell, Inbox, History, ShoppingBag } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { useState, useEffect } from "react";
 import { createBrowserClient } from "@supabase/ssr";
@@ -32,11 +32,13 @@ interface SidebarItem {
   subItems?: SidebarSubItem[];
   target?: string;
   rel?: string;
+  ownerAdminOnly?: boolean;
 }
 
 const sidebarItems: SidebarItem[] = [
   { label: "Overview", href: "/indoorme", icon: LayoutDashboard },
   { label: "Orders", href: "/indoorme/orders", icon: ShoppingCart },
+  { label: "Abandoned Carts", href: "/indoorme/abandoned-carts", icon: ShoppingBag },
   {
     label: "Products",
     icon: Package,
@@ -47,9 +49,11 @@ const sidebarItems: SidebarItem[] = [
     ]
   },
   { label: "Customers", href: "/indoorme/customers", icon: Users },
-  { label: "Finance", href: "/indoorme/finance", icon: Wallet },
+  { label: "Finance", href: "/indoorme/finance", icon: Wallet, ownerAdminOnly: true },
   { label: "Discounts", href: "/indoorme/discounts", icon: TicketPercent },
   { label: "Notifications", href: "/indoorme/notifications", icon: Bell },
+  { label: "Messages", href: "/indoorme/messages", icon: Inbox },
+  { label: "Activity", href: "/indoorme/activity", icon: History },
   { label: "My Store", href: "/", icon: Store, target: "_blank", rel: "noopener noreferrer" },
 ];
 
@@ -64,6 +68,7 @@ export default function AdminLayout({
   const [mounted, setMounted] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isOwnerOrAdmin, setIsOwnerOrAdmin] = useState(false);
   const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
   useEffect(() => {
@@ -80,6 +85,16 @@ export default function AdminLayout({
           router.push('/');
           return;
         }
+
+        // Middleware enforces access; this only decides which menu items to show.
+        const { data: storeUsers } = await supabase
+          .from('store_users')
+          .select('role:store_roles!role_id (name)')
+          .eq('user_id', session.user.id)
+          .eq('status', 'active');
+        setIsOwnerOrAdmin(
+          (storeUsers ?? []).some((row: any) => ['Owner', 'Admin'].includes(row.role?.name))
+        );
         
         setIsAuthorized(true);
       } catch (error) {
@@ -112,6 +127,18 @@ export default function AdminLayout({
     return null;
   }
 
+  // The 2FA challenge stands alone, without the admin chrome.
+  if (pathname === '/indoorme/mfa') {
+    return (
+      <Providers>
+        <div className={geist.className}>
+          {children}
+          <Toaster />
+        </div>
+      </Providers>
+    );
+  }
+
   const toggleExpand = (label: string) => {
     setExpandedItems(prev => 
       prev.includes(label) 
@@ -139,7 +166,7 @@ export default function AdminLayout({
             <div className="flex flex-1 overflow-hidden">
               <aside className="w-64 bg-white border-r flex flex-col">
                 <nav className="px-4 pt-6 flex-1 overflow-y-auto">
-                  {sidebarItems.map((item) => {
+                  {sidebarItems.filter((item) => !item.ownerAdminOnly || isOwnerOrAdmin).map((item) => {
                     const Icon = item.icon;
                     const isActive = pathname === item.href;
                     const isExpanded = expandedItems.includes(item.label);
@@ -200,6 +227,7 @@ export default function AdminLayout({
                     );
                   })}
                 </nav>
+                {isOwnerOrAdmin && (
                 <div className="px-4 py-4 border-t">
                   <Link
                     href="/indoorme/settings"
@@ -213,6 +241,7 @@ export default function AdminLayout({
                     <span>Settings</span>
                   </Link>
                 </div>
+                )}
               </aside>
               <main className="flex-1 overflow-y-auto bg-white">
                 {/* Removed static Dashboard title */}

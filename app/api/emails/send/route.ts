@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EmailService } from '@/lib/email';
+import { requireAdmin } from '@/lib/admin-auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,6 +13,11 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Admin-only: these emails can target arbitrary recipients. The public
+    // contact form goes through /api/contact instead.
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.response;
 
     let result;
 

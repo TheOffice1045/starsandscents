@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/store/cart";
 import { useCoupons } from "@/lib/hooks/useCoupons";
+import { usePaymentOptions } from "@/lib/hooks/usePaymentOptions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, ShoppingBag, CreditCard, Info, Truck, Tag, X, Check, Plus, Minus } from "lucide-react";
@@ -27,6 +28,7 @@ export default function CheckoutPage() {
   const [isClient, setIsClient] = useState(false);
   const [orderNotes, setOrderNotes] = useState("");
   const [couponCode, setCouponCode] = useState("");
+  const payments = usePaymentOptions();
   
   // Coupon functionality
   const { validateCoupon, removeCoupon, calculateDiscountedTotal, appliedCoupon, isValidating, error: couponError } = useCoupons();
@@ -391,67 +393,87 @@ export default function CheckoutPage() {
                 </div>
               </div>
               
-              <Button 
-                onClick={handleCheckout} 
-                className="w-full bg-[#5D4037] hover:bg-[#3E2723] text-white hover:text-[#FFFFFF] py-6 rounded-lg transition-colors duration-200 flex items-center justify-center shadow-md hover:shadow-lg"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="mr-2 h-5 w-5" />
-                    Proceed to Payment
-                  </>
-                )}
-              </Button>
-              
+              {!payments && (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                </div>
+              )}
+              {payments && !payments.stripe && !payments.venmo && !payments.zelle && (
+                <p className="text-sm text-center text-gray-500">Checkout is temporarily unavailable. Please check back soon.</p>
+              )}
+              {payments?.stripe && (
+                <Button 
+                  onClick={handleCheckout} 
+                  className="w-full bg-[#5D4037] hover:bg-[#3E2723] text-white hover:text-[#FFFFFF] py-6 rounded-lg transition-colors duration-200 flex items-center justify-center shadow-md hover:shadow-lg"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="mr-2 h-5 w-5" />
+                      Proceed to Payment
+                    </>
+                  )}
+                </Button>
+              )}
+
               <div className="mt-6 text-center">
-                <div className="flex items-center justify-center mb-3 bg-gray-50 p-3 rounded-lg">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  <p className="text-sm text-gray-500">
-                    Secure payment powered by Stripe
-                  </p>
-                </div>
-                
-                <div className="relative mb-4">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-200"></div>
-                  </div>
-                  <div className="relative flex justify-center text-xs">
-                    <span className="px-2 bg-white text-gray-500">OR</span>
-                  </div>
-                </div>
-                
-                <div className="flex justify-center space-x-3 mb-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="text-xs flex items-center border-[#008CFF] text-[#008CFF] hover:bg-[#008CFF] hover:text-white shadow-sm"
-                    onClick={() => window.open('https://account.venmo.com/u/StarsScents', '_blank')}
-                  >
-                    <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M19.5 3.5h-15c-1.1 0-2 .9-2 2v13c0 1.1.9 2 2 2h15c1.1 0 2-.9 2-2v-13c0-1.1-.9-2-2-2zm-8.79 14c-3.03 0-4.71-1.4-4.71-3.2 0-1.42.8-2.78 2.21-3.37.65-.27 1.21-.09 1.64.29.33.3.5.71.5 1.18 0 .26-.08.52-.22.73-.13.21-.3.38-.51.51-.45.26-.91.39-1.37.39-.22 0-.44-.03-.65-.1.19.65.78 1.07 1.5 1.07.41 0 .8-.12 1.13-.35.33-.23.6-.55.77-.93l1.5-5.3c.11-.4.38-.6.7-.6.31 0 .58.2.69.6l2.4 8.2c.05.17.06.34.02.51-.04.17-.13.32-.26.44-.13.12-.28.2-.45.24-.17.04-.34.03-.5-.02-.16-.05-.3-.14-.41-.27-.11-.13-.19-.28-.22-.45l-1.6-5.29-.79 2.63.99 3.35c.05.17.06.34.02.51-.04.17-.13.32-.26.44-.13.12-.28.2-.45.24-.17.04-.34.03-.5-.02-.16-.05-.3-.14-.41-.27-.11-.13-.19-.28-.22-.45l-1.43-4.8c-.33.53-.77.97-1.32 1.28-.54.31-1.16.47-1.78.47z"/>
+                {payments?.stripe && (
+                  <div className="flex items-center justify-center mb-3 bg-gray-50 p-3 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
-                    Pay with Venmo
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="text-xs flex items-center border-[#6D1ED4] text-[#6D1ED4] hover:bg-[#6D1ED4] hover:text-white shadow-sm"
-                    onClick={() => window.open('https://enroll.zellepay.com/qr-codes?data=eyJuYW1lIjoiWUVNSVNJIiwiYWN0aW9uIjoicGF5bWVudCIsInRva2VuIjoiNDQzODI0MTk4MSJ9', '_blank')}
-                  >
-                    <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M19.5 3.5h-15c-1.1 0-2 .9-2 2v13c0 1.1.9 2 2 2h15c1.1 0 2-.9 2-2v-13c0-1.1-.9-2-2-2zm-7.45 13.98c-2.87 0-5.21-2.34-5.21-5.21 0-2.87 2.34-5.21 5.21-5.21 1.25 0 2.4.44 3.3 1.18l-1.35 1.35c-.51-.36-1.13-.57-1.8-.57-1.73 0-3.14 1.41-3.14 3.14 0 1.73 1.41 3.14 3.14 3.14 1.49 0 2.73-1.04 3.05-2.43h-3.05v-1.78h5.08c.06.33.09.67.09 1.02 0 2.87-2.34 5.21-5.21 5.21z"/>
-                    </svg>
-                    Pay with Zelle
-                  </Button>
-                </div>
+                    <p className="text-sm text-gray-500">
+                      Secure payment powered by Stripe
+                    </p>
+                  </div>
+                )}
+
+                {payments?.stripe && (payments.venmo || payments.zelle) && (
+                  <div className="relative mb-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-200"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs">
+                      <span className="px-2 bg-white text-gray-500">OR</span>
+                    </div>
+                  </div>
+                )}
+
+                {(payments?.venmo || payments?.zelle) && (
+                  <div className="flex justify-center space-x-3 mb-4">
+                    {payments.venmo && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-xs flex items-center border-[#008CFF] text-[#008CFF] hover:bg-[#008CFF] hover:text-white shadow-sm"
+                        onClick={() => window.open(payments.venmo!, '_blank', 'noopener,noreferrer')}
+                      >
+                        <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M19.5 3.5h-15c-1.1 0-2 .9-2 2v13c0 1.1.9 2 2 2h15c1.1 0 2-.9 2-2v-13c0-1.1-.9-2-2-2zm-8.79 14c-3.03 0-4.71-1.4-4.71-3.2 0-1.42.8-2.78 2.21-3.37.65-.27 1.21-.09 1.64.29.33.3.5.71.5 1.18 0 .26-.08.52-.22.73-.13.21-.3.38-.51.51-.45.26-.91.39-1.37.39-.22 0-.44-.03-.65-.1.19.65.78 1.07 1.5 1.07.41 0 .8-.12 1.13-.35.33-.23.6-.55.77-.93l1.5-5.3c.11-.4.38-.6.7-.6.31 0 .58.2.69.6l2.4 8.2c.05.17.06.34.02.51-.04.17-.13.32-.26.44-.13.12-.28.2-.45.24-.17.04-.34.03-.5-.02-.16-.05-.3-.14-.41-.27-.11-.13-.19-.28-.22-.45l-1.6-5.29-.79 2.63.99 3.35c.05.17.06.34.02.51-.04.17-.13.32-.26.44-.13.12-.28.2-.45.24-.17.04-.34.03-.5-.02-.16-.05-.3-.14-.41-.27-.11-.13-.19-.28-.22-.45l-1.43-4.8c-.33.53-.77.97-1.32 1.28-.54.31-1.16.47-1.78.47z"/>
+                        </svg>
+                        Pay with Venmo
+                      </Button>
+                    )}
+                    {payments.zelle && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-xs flex items-center border-[#6D1ED4] text-[#6D1ED4] hover:bg-[#6D1ED4] hover:text-white shadow-sm"
+                        onClick={() => window.open(payments.zelle!, '_blank', 'noopener,noreferrer')}
+                      >
+                        <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M19.5 3.5h-15c-1.1 0-2 .9-2 2v13c0 1.1.9 2 2 2h15c1.1 0 2-.9 2-2v-13c0-1.1-.9-2-2-2zm-7.45 13.98c-2.87 0-5.21-2.34-5.21-5.21 0-2.87 2.34-5.21 5.21-5.21 1.25 0 2.4.44 3.3 1.18l-1.35 1.35c-.51-.36-1.13-.57-1.8-.57-1.73 0-3.14 1.41-3.14 3.14 0 1.73 1.41 3.14 3.14 3.14 1.49 0 2.73-1.04 3.05-2.43h-3.05v-1.78h5.08c.06.33.09.67.09 1.02 0 2.87-2.34 5.21-5.21 5.21z"/>
+                        </svg>
+                        Pay with Zelle
+                      </Button>
+                    )}
+                  </div>
+                )}
                 
                
               </div>

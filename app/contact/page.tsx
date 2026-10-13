@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useEmail } from "@/lib/hooks/useEmail";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -14,24 +13,25 @@ export default function ContactPage() {
     subject: "",
     message: "",
   });
-
-  const { sendContactForm, isLoading } = useEmail();
+  // Honeypot: hidden from people, often filled in by spam bots.
+  const [website, setWebsite] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const siteConfig = useSiteConfig();
   const storeName = siteConfig.name;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    setIsLoading(true);
     try {
-      const result = await sendContactForm(
-        formData.name,
-        formData.email,
-        formData.subject,
-        formData.message,
-        storeName
-      );
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formData, website, storeName }),
+      });
+      const result = await response.json();
 
-      if (result.success) {
+      if (response.ok && result.success) {
         toast.success("Message sent successfully! We'll get back to you soon.");
         setFormData({ name: "", email: "", subject: "", message: "" });
       } else {
@@ -39,6 +39,8 @@ export default function ContactPage() {
       }
     } catch (error) {
       toast.error("An error occurred. Please try again later.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -81,6 +83,16 @@ export default function ContactPage() {
           </div>
           <div>
             <form onSubmit={handleSubmit} className="space-y-6">
+              <input
+                type="text"
+                name="website"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="hidden"
+              />
               <div>
                 <label htmlFor="name" className="block font-medium mb-2">
                   Name

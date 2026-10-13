@@ -22,6 +22,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import type { CartItem } from '@/lib/store/cart';
 import { AdminButton } from "@/components/ui/admin-button";
 import { useSettingsStore } from "@/lib/store/settings";
+import { useEmail } from "@/lib/hooks/useEmail";
 
 interface TrackingInfo {
   trackingNumber: string;
@@ -32,6 +33,7 @@ interface Order {
   id: string;
   order_number: string;
   customer_name: string;
+  customer_email?: string;
   shipping_address: any;
   fulfillment_status: string;
   items: any[];
@@ -46,6 +48,7 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
   const orderId = params.id;
   const orderNumber = `#${orderId}`;
   const { settings } = useSettingsStore();
+  const { sendShippingConfirmation } = useEmail();
 
   // Format the store address
   const storeAddress = [
@@ -64,6 +67,8 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
   const [loading, setLoading] = useState(true);
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [fulfillmentMethod, setFulfillmentMethod] = useState("shipping");
+  const [showTrackingTip, setShowTrackingTip] = useState(true);
+  const [shippingAddress, setShippingAddress] = useState<any>(null);
 
   // Consolidated fetch function
   const fetchOrderData = useCallback(async () => {
@@ -112,6 +117,13 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
         setOrderItems(itemsData || []);
       }
       
+      const { data: addressData } = await supabase
+        .from('shipping_addresses')
+        .select('*')
+        .eq('order_id', orderId)
+        .maybeSingle();
+      setShippingAddress(addressData);
+
       console.log('Order data received:', orderData);
       
       // Set the order with items from the order data
@@ -163,6 +175,93 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
     setTrackingInfos(trackingInfos.filter((_, i) => i !== index));
   };
 
+  // One-line-per-field address, from shipping_addresses first, then the legacy order column.
+  const addressLines: string[] = shippingAddress
+    ? [
+        [shippingAddress.first_name, shippingAddress.last_name].filter(Boolean).join(' '),
+        shippingAddress.address_line1,
+        shippingAddress.address_line2,
+        [shippingAddress.city, shippingAddress.state, shippingAddress.postal_code].filter(Boolean).join(', '),
+        shippingAddress.country,
+        shippingAddress.phone,
+      ].filter(Boolean)
+    : [
+        order?.shipping_address?.street,
+        [order?.shipping_address?.city, order?.shipping_address?.state, order?.shipping_address?.postal_code]
+          .filter(Boolean)
+          .join(', '),
+      ].filter(Boolean);
+
+  const handlePrintPackingSlip = () => {
+    if (!order) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('Pop-up blocked. Please allow pop-ups for this site.');
+      return;
+    }
+
+    const escapeHtml = (value: unknown) =>
+      String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const rows = orderItems
+      .map(
+        (item) => `
+          <tr>
+            <td>${escapeHtml(item.product_name || item.name)}${item.size ? `<div class="muted">${escapeHtml(item.size)}</div>` : ''}</td>
+            <td class="qty">${escapeHtml(item.quantity || 1)}</td>
+          </tr>`
+      )
+      .join('');
+
+    printWindow.document.write(`<!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Packing slip - ${escapeHtml(order.order_number)}</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #333; margin: 0; padding: 24px; }
+            .slip { max-width: 720px; margin: 0 auto; }
+            h1 { font-size: 20px; margin: 0 0 4px; }
+            .muted { color: #777; font-size: 12px; }
+            .columns { display: flex; gap: 48px; margin: 24px 0; }
+            .label { font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #eee; }
+            th.qty, td.qty { text-align: right; width: 80px; }
+          </style>
+        </head>
+        <body>
+          <div class="slip">
+            <h1>${escapeHtml(settings.name || 'Packing slip')}</h1>
+            <div class="muted">Packing slip &middot; Order ${escapeHtml(order.order_number)}</div>
+            <div class="columns">
+              <div>
+                <div class="label">Ship to</div>
+                ${addressLines.length ? addressLines.map((line) => `<div>${escapeHtml(line)}</div>`).join('') : '<div class="muted">No address on file</div>'}
+              </div>
+              <div>
+                <div class="label">Ship from</div>
+                <div>${escapeHtml(settings.name || '')}</div>
+                <div>${escapeHtml(storeAddress)}</div>
+              </div>
+            </div>
+            <table>
+              <thead><tr><th>Item</th><th class="qty">Qty</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </body>
+      </html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   const handleFulfillment = async () => {
     setIsSubmitting(true);
   
@@ -180,21 +279,49 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
         .update({
           fulfillment_status: 'fulfilled',
           tracking_info: fulfillmentMethod === "shipping" ? trackingInfos : null,
-          shipping_method: fulfillmentMethod, // Save the fulfillment method
+          // shipping_method is the option the customer chose at checkout; keep it.
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
   
       if (orderError) throw orderError;
+
+      // Record how it went out in the order's history instead.
+      const methodLabel = { shipping: 'Shipped', pickup: 'Picked up', direct_delivery: 'Delivered directly' }[fulfillmentMethod] ?? fulfillmentMethod;
+      await supabase.from('order_history').insert({
+        order_id: orderId,
+        status_from: orderStatus,
+        status_to: 'fulfilled',
+        notes: fulfillmentMethod === "shipping"
+          ? `${methodLabel}: ${trackingInfos.map(info => `${info.carrier.toUpperCase()} ${info.trackingNumber}`).join(', ')}`
+          : methodLabel,
+      });
   
       // Update local state
       setOrderStatus('fulfilled');
 
-      if (notifyCustomer) {
-        console.log('Sending notification to customer with tracking:', trackingInfos);
-      }
-  
       toast.success("Order fulfilled successfully");
+
+      // Tracking details only exist for shipped orders; pickup/delivery have nothing to send.
+      if (notifyCustomer && fulfillmentMethod === "shipping") {
+        if (!order?.customer_email) {
+          toast.warning("Order fulfilled, but there is no customer email on file to notify.");
+        } else {
+          const result = await sendShippingConfirmation(
+            order.customer_email,
+            order.customer_name || 'Customer',
+            order.order_number,
+            trackingInfos.map(info => info.trackingNumber).join(', '),
+            trackingInfos.map(info => info.carrier).join(', '),
+            settings.name || undefined
+          );
+          if (result.success) {
+            toast.success(`Shipping confirmation sent to ${order.customer_email}`);
+          } else {
+            toast.warning(`Order fulfilled, but the shipping email failed: ${result.error}`);
+          }
+        }
+      }
       router.push('/indoorme/orders?status=fulfilled');
       router.refresh();
   
@@ -225,7 +352,7 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
               </Link>
               <h1 className="text-sm font-medium truncate max-w-md">Fulfill items - {order.order_number}</h1>
             </div>
-            <AdminButton variant="outline">Print packing slip</AdminButton>
+            <AdminButton variant="outline" onClick={handlePrintPackingSlip}>Print packing slip</AdminButton>
           </div>
 
           <div className="grid grid-cols-3 gap-6">
@@ -242,7 +369,7 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
                       : orderStatus === 'partially_fulfilled'
                         ? 'Partially Fulfilled'
                         : 'Unfulfilled'}
-                    {orderStatus !== 'fulfilled' && " (2)"}
+                    {orderStatus !== 'fulfilled' && orderItems.length > 0 ? ` (${orderItems.length})` : ''}
                   </span>
                   <span className="text-xs text-gray-500">{orderNumber}</span>
                 </div>
@@ -250,7 +377,9 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
                 <div className="mb-6">
                   <h2 className="font-medium mb-2">{order?.customer_name || ''}</h2>
                   <div className="text-sm text-gray-500">
-                    {order?.shipping_address?.street || ''}
+                    {addressLines.length
+                      ? addressLines.map((line, i) => <div key={i}>{line}</div>)
+                      : 'No shipping address on file'}
                   </div>
                 </div>
 
@@ -260,14 +389,14 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
                       <div className="w-16 h-16 bg-gray-100 rounded">
                         <Image 
                           src={item.image_url || "/placeholder.jpg"} 
-                          alt={item.name} 
+                          alt={(item.product_name || item.name)} 
                           width={64} 
                           height={64} 
                           className="rounded" 
                         />
                       </div>
                       <div className="flex-1">
-                        <div className="font-medium text-blue-600">{item.name}</div>
+                        <div className="font-medium text-blue-600">{(item.product_name || item.name)}</div>
                         {item.size && <div className="text-sm text-gray-500">{item.size}</div>}
                       </div>
                       <div className="text-sm">
@@ -282,6 +411,7 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
                 </div>
 
                 <div className="mt-6 space-y-6">
+                  {showTrackingTip && (
                   <div className="bg-blue-50 p-4 rounded-lg flex items-start gap-4">
                     <div className="flex-1">
                       <h3 className="text-sm font-medium mb-1">Add tracking to improve customer satisfaction</h3>
@@ -289,10 +419,11 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
                         Orders with tracking let customers receive delivery updates and reduce support requests.
                       </p>
                     </div>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => setShowTrackingTip(false)} aria-label="Dismiss">
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
+                  )}
 
                   <div className="space-y-2">
                   <h3 className="font-medium mb-4">Fulfillment Method</h3>
@@ -404,7 +535,6 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
                           : 'Unfulfilled'}
                       {orderStatus !== 'fulfilled' && orderItems.length > 0 ? ` (${orderItems.length})` : ''}
                     </span>
-                    <Button variant="ghost" size="sm">•••</Button>
                   </div>
                 </div>
 
@@ -420,14 +550,14 @@ export default function FulfillOrderPage({ params }: { params: { id: string } })
                         <div className="w-12 h-12 bg-gray-100 rounded-md overflow-hidden">
                           <Image 
                             src={item.image_url || "/placeholder.jpg"} 
-                            alt={item.name || 'Product'} 
+                            alt={(item.product_name || item.name) || 'Product'} 
                             width={48} 
                             height={48} 
                             className="object-cover w-full h-full" 
                           />
                         </div>
                         <div>
-                          <div className="font-medium text-sm">{item.name}</div>
+                          <div className="font-medium text-sm">{(item.product_name || item.name)}</div>
                           {item.size && <div className="text-xs text-gray-500">{item.size}</div>}
                         </div>
                       </div>
