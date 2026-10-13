@@ -51,6 +51,7 @@ Status key: ✅ done in code (not yet tested live) · 🙋 needs you · ⛔ bloc
 | F13 | Activity log at /indoorme/activity (DB triggers record who changed what) | ✅ (migration 0008) |
 | F14 | 2FA for admins: enrol on Profile, enforced by middleware via /indoorme/mfa | ✅ (needs U7) |
 | F16 | Settings → Users rebuilt on a server API (`/api/admin/users`): invites email a set-password link and link the login so access actually works; unlinked rows auto-link by email; role/status/remove fixed (were keyed on the wrong id); guards for self-edits, last Owner, and Owner-only changes; roles that grant access can't be renamed/deleted, assigned roles can't be deleted | ✅ |
+| F17 | Table mismatches fixed: reviews form now uses `product_reviews` (matched by customer email, not the missing `reviews`/`user_id`); collection counts/delete use `products.collection_id` (the live relation) instead of the missing `collection_products`; `discount_products` recreated (migration 0010 `20261013000000`); dead `app/components/product/ProductReviews.tsx` removed | ✅ (0010 needs applying) |
 | F15 | Fulfilment overwrote the customer's chosen shipping option; now kept, and fulfilment is logged in order history | ✅ |
 
 ## Known limits / not built (decide if wanted)
