@@ -1,7 +1,7 @@
 # Admin hardening tracker
 
-Branch: `admin-hardening` (local, uncommitted, not pushed; pushing `main` auto-deploys the live site).
-Last updated: 2026-10-12. `next build` (with lint) passes on the branch.
+Branch: `admin-hardening` (pushed; open as PR #1 https://github.com/TheOffice1045/starsandscents/pull/1. Merging to `main` auto-deploys the live site).
+Last updated: 2026-10-13. `next build` (with lint) passes on the branch.
 
 Status key: ✅ done in code (not yet tested live) · 🙋 needs you · ⛔ blocked (reason given)
 
@@ -19,7 +19,7 @@ Status key: ✅ done in code (not yet tested live) · 🙋 needs you · ⛔ bloc
 | U8 | Send a schema dump: `supabase db dump --schema public -f schema-live.sql` (CLI isn't linked here). Unblocks S4, F9, F10 | 🙋 |
 | U9 | Delete stray/dead files. My delete was blocked by the permission guard: `app/account/.page.tsx.swp`, `app/indoorme/products/add/.page.tsx.swp`, `app/indoorme/settings/.page.tsx.swp`, `app/indoorme/products/page.tsx.backup`, `app/indoorme/orders/create/page1.tsx`, `app/indoorme/products/add/page2.tsx`, `app/checkout/page1.tsx`, `components/account/OrdersTab1.tsx`, `components/ui/use-toast copy.tsx`, `app/indoorme/components/sidebar.tsx`, `lib/auth.ts` (unused; hardcoded JWT secret) | 🙋 |
 | U10 | Restart your local `next dev` (a build I ran collided with its `.next` folder) | 🙋 |
-| U11 | Committed locally on `admin-hardening` (df5c7ce, not pushed). Merge/push to `main` only after U1–U3, since that deploys live | 🙋 |
+| U11 | Branch pushed and open as PR #1. Merge to `main` only after U2, U3 and applying migration 0010, since that deploys live | 🙋 |
 
 ## Security
 
