@@ -13,13 +13,13 @@ Status key: ✅ done in code (not yet tested live) · 🙋 needs you · ⛔ bloc
 | U2 | **Stripe dashboard → Webhooks → your endpoint → add events** `charge.refunded` and `checkout.session.expired` (refund sync + abandoned carts depend on them) | 🙋 |
 | U3 | **Smoke test** (list at bottom) | 🙋 |
 | U4 | Roll the Stripe secret key / PayPal client secret if a real one was ever saved in the old Payments form | 🙋 |
-| U5 | `.env` (DATABASE_URL) was committed + pushed in the initial commit. It's now untracked (`git rm --cached`, file kept on disk) but still in git history → rotate the DB password if that URL had a real one | 🙋 |
+| U5 | ~~Rotate DB password~~: checked, the `.env` that was committed only held a placeholder (`johndoe:randompassword@localhost`). Nothing to rotate | ✅ |
 | U6 | Supabase Auth → make sure **email confirmations are ON** (customers see orders matched by email) | 🙋 |
 | U7 | Supabase Auth → make sure **MFA (TOTP) is enabled** (on by default on hosted projects) so the new 2FA works | 🙋 |
 | U8 | Send a schema dump: `supabase db dump --schema public -f schema-live.sql` (CLI isn't linked here). Unblocks S4, F9, F10 | 🙋 |
 | U9 | Delete stray/dead files. My delete was blocked by the permission guard: `app/account/.page.tsx.swp`, `app/indoorme/products/add/.page.tsx.swp`, `app/indoorme/settings/.page.tsx.swp`, `app/indoorme/products/page.tsx.backup`, `app/indoorme/orders/create/page1.tsx`, `app/indoorme/products/add/page2.tsx`, `app/checkout/page1.tsx`, `components/account/OrdersTab1.tsx`, `components/ui/use-toast copy.tsx`, `app/indoorme/components/sidebar.tsx`, `lib/auth.ts` (unused; hardcoded JWT secret) | 🙋 |
 | U10 | Restart your local `next dev` (a build I ran collided with its `.next` folder) | 🙋 |
-| U11 | Review, commit and push/merge `admin-hardening` | 🙋 |
+| U11 | Committed locally on `admin-hardening` (df5c7ce, not pushed). Merge/push to `main` only after U1–U3, since that deploys live | 🙋 |
 
 ## Security
 
