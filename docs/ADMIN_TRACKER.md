@@ -9,7 +9,7 @@ Status key: ✅ done in code (not yet tested live) · 🙋 needs you · ⛔ bloc
 
 | # | Item | Status |
 |---|------|--------|
-| U1 | **Apply migrations 0005–0009** (below), on a Supabase branch/staging first. 0000–0004 you reported applied | 🙋 |
+| U1 | **Run `supabase/apply_0000_0009.sql` in the Supabase SQL editor.** Live check (2026-10-13): 0000 and 0003 were never applied (0001/0002/0004 were). The script runs all ten in one transaction and is safe to re-run | 🙋 |
 | U2 | **Stripe dashboard → Webhooks → your endpoint → add events** `charge.refunded` and `checkout.session.expired` (refund sync + abandoned carts depend on them) | 🙋 |
 | U3 | **Smoke test** (list at bottom) | 🙋 |
 | U4 | Roll the Stripe secret key / PayPal client secret if a real one was ever saved in the old Payments form | 🙋 |
