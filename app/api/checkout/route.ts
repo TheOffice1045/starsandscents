@@ -101,6 +101,12 @@ export async function POST(req: Request) {
       );
     }
 
+    // Bundles draw on their candles' stock, so check total demand per candle
+    // (a bundle plus the same candle on its own can't oversell it).
+    if (outOfStockProducts.length === 0) {
+      outOfStockProducts.push(...(await checkBundleStock(items)));
+    }
+
     // Return error with details about out of stock products
     if (outOfStockProducts.length > 0) {
       const product = outOfStockProducts[0];
@@ -268,4 +274,33 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
+}
+async function checkBundleStock(
+  items: { id: string; name?: string; quantity: number }[]
+): Promise<{ id: string; name: string; available: number }[]> {
+  const ids = items.map((item) => item.id);
+  const { data: bundleRows, error } = await supabase
+    .from('product_bundle_items')
+    .select('bundle_id, product_id, quantity')
+    .in('bundle_id', ids);
+  // Table not migrated yet (or lookup failed): the per-item check above still applies.
+  if (error || !bundleRows || bundleRows.length === 0) return [];
+
+  const demand = new Map<string, number>();
+  const add = (productId: string, qty: number) => demand.set(productId, (demand.get(productId) ?? 0) + qty);
+  for (const item of items) {
+    const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    const parts = bundleRows.filter((row) => row.bundle_id === item.id);
+    if (parts.length > 0) parts.forEach((part) => add(part.product_id, part.quantity * qty));
+    else add(item.id, qty);
+  }
+
+  const { data: stock } = await supabase
+    .from('products')
+    .select('id, title, quantity')
+    .in('id', Array.from(demand.keys()));
+
+  return (stock ?? [])
+    .filter((product) => (demand.get(product.id) ?? 0) > (product.quantity ?? 0))
+    .map((product) => ({ id: product.id, name: product.title || product.id, available: product.quantity ?? 0 }));
 }
