@@ -165,13 +165,19 @@ export function AdminHeader({ className = "" }: { className?: string }) {
             <DropdownMenuSeparator />
             
             <DropdownMenuGroup>
+            <Link href="/indoorme/profile">
+              <DropdownMenuItem>
+                <User className="mr-2 h-4 w-4" />
+                <span>Profile &amp; security</span>
+              </DropdownMenuItem>
+              </Link>
             <Link href="/indoorme/orders">
               <DropdownMenuItem>
                 <ShoppingCart className="mr-2 h-4 w-4" />
                 <span>Orders</span>
               </DropdownMenuItem>
               </Link>
-            <Link href="/indoorme/products">
+            <Link href="/indoorme/products/inventory">
               <DropdownMenuItem>
                 <PackageCheck className="mr-2 h-4 w-4" />
                 <span>Inventory</span>

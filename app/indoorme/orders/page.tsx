@@ -254,9 +254,9 @@ export default function OrdersPage() {
      case "Fulfilled":
        return order.fulfillment_status === "fulfilled";
      case "Unpaid":
-       return order.payment_status !== "paid";
+       return !["paid", "refunded", "partially_refunded"].includes(order.payment_status);
      case "Paid":
-       return order.payment_status === "paid";
+       return order.payment_status === "paid" || order.payment_status === "partially_refunded";
      default:
        return true;
    }
@@ -270,18 +270,19 @@ export default function OrdersPage() {
 
  const handleDeleteOrder = async (orderId: string) => {
    try {
-     const { error } = await supabase
-       .from('orders')
-       .delete()
-       .eq('id', orderId);
-     
-     if (error) throw error;
-     
+     // Server-side: blocks paid orders and restocks unshipped items
+     const response = await fetch(`/api/admin/orders/${orderId}`, { method: 'DELETE' });
+     const result = await response.json();
+     if (!response.ok) throw new Error(result.error || 'Failed to delete order');
+
      toast.success('Order deleted successfully');
+     if (result.restockFailures > 0) {
+       toast.warning(`${result.restockFailures} item(s) could not be restocked; adjust stock manually.`);
+     }
      fetchOrders(); // Refresh the orders list
    } catch (error: any) {
      console.error('Error deleting order:', error);
-     toast.error('Failed to delete order');
+     toast.error(error.message || 'Failed to delete order');
    }
  };
 
@@ -607,9 +608,10 @@ export default function OrdersPage() {
                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                      order.payment_status === "paid" ? "bg-green-100 text-green-800" :
                      order.payment_status === "authorized" ? "bg-blue-100 text-blue-800" :
+                     order.payment_status === "refunded" || order.payment_status === "partially_refunded" ? "bg-orange-100 text-orange-800" :
                      "bg-yellow-100 text-yellow-800"
                    }`}>
-                     {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
+                     {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1).replace('_', ' ')}
                    </span>
                  </td>
                  <td className="py-3 px-10 text-left align-middle">

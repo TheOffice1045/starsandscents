@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { headers } from 'next/headers';
 import { createBrowserClient } from '@supabase/ssr';
+import { getShippingQuotes, normalizeShippingConfig, validateShippingConfig } from '@/lib/shipping';
+import { normalizePaymentConfig } from '@/lib/payments';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
@@ -46,6 +48,9 @@ export async function POST(req: Request) {
     // Verify stock levels for all items and collect invalid products
     const invalidProducts: { id: string; name: string; reason: string }[] = [];
     const outOfStockProducts: { id: string; name: string; available: number }[] = [];
+    // Authoritative prices/names from the database, so the charge (and the free
+    // shipping threshold) can't be influenced by what the browser sends.
+    const productsById = new Map<string, { title: string | null; price: number }>();
 
     for (const item of items) {
       // Validate item has required fields
@@ -60,7 +65,7 @@ export async function POST(req: Request) {
 
       const { data: product } = await supabase
         .from('products')
-        .select('quantity')
+        .select('quantity, price, title')
         .eq('id', item.id)
         .single();
 
@@ -72,6 +77,8 @@ export async function POST(req: Request) {
         });
         continue;
       }
+
+      productsById.set(item.id, { title: product.title, price: Number(product.price) || 0 });
 
       if (product.quantity < item.quantity) {
         outOfStockProducts.push({
@@ -108,9 +115,11 @@ export async function POST(req: Request) {
     }
 
     // Prepare line items for Stripe
+    let subtotalCents = 0;
     const lineItems = items.map((item: any) => {
-      // Ensure item has a name, use fallback if missing
-      const name = item.name || 'Product';
+      const product = productsById.get(item.id)!;
+      const name = product.title || item.name || 'Product';
+      const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
 
       // Limit image URL length to avoid URL size issues
       let imageUrl = null;
@@ -119,9 +128,9 @@ export async function POST(req: Request) {
         imageUrl = item.image.length < 500 ? item.image : null;
       }
 
-      // Price from cart is in dollars (e.g., 15.00 for $15)
-      // Stripe expects cents (e.g., 1500 for $15)
-      const priceInCents = Math.round(item.price * 100);
+      // Prices are stored in dollars (e.g., 15.00 for $15); Stripe expects cents
+      const priceInCents = Math.round(product.price * 100);
+      subtotalCents += priceInCents * quantity;
 
       return {
         price_data: {
@@ -135,17 +144,73 @@ export async function POST(req: Request) {
           },
           unit_amount: priceInCents,
         },
-        quantity: item.quantity || 1, // Default to 1 if quantity is missing
+        quantity,
       };
     });
+
+    // Shipping options and payment methods come from the admin settings
+    const { data: storeSettings, error: settingsError } = await supabase
+      .from('store_settings')
+      .select('shipping_methods, payment_methods')
+      .limit(1)
+      .maybeSingle();
+
+    // 42703 = a settings column not migrated yet; fall back to the defaults
+    if (settingsError && settingsError.code !== '42703') {
+      console.error('Error loading store settings:', settingsError);
+      return NextResponse.json(
+        { message: 'Shipping is temporarily unavailable. Please try again shortly.' },
+        { status: 500 }
+      );
+    }
+
+    const paymentConfig = normalizePaymentConfig(settingsError ? null : storeSettings?.payment_methods);
+    if (!paymentConfig.stripe.enabled) {
+      return NextResponse.json(
+        { message: 'Card payments are currently turned off. Please use another payment option.' },
+        { status: 403 }
+      );
+    }
+
+    const shippingConfig = normalizeShippingConfig(settingsError ? null : storeSettings?.shipping_methods);
+    const shippingProblems = validateShippingConfig(shippingConfig);
+    if (shippingProblems.length > 0) {
+      console.error('Shipping settings are invalid:', shippingProblems);
+      return NextResponse.json(
+        { message: 'Shipping is temporarily unavailable. Please try again shortly.' },
+        { status: 500 }
+      );
+    }
+
+    // Free shipping threshold is checked against the subtotal after discounts
+    const discountCents = coupon?.discount_amount ? Math.round(Number(coupon.discount_amount) * 100) : 0;
+    const discountedSubtotal = Math.max(0, subtotalCents - discountCents) / 100;
+
+    const shippingOptions = getShippingQuotes(shippingConfig, discountedSubtotal).map((quote) => ({
+      shipping_rate_data: {
+        type: 'fixed_amount',
+        display_name: quote.label.slice(0, 100),
+        fixed_amount: { amount: Math.round(quote.amount * 100), currency: 'usd' },
+        metadata: { shipping_method: quote.id },
+        ...(quote.minDays && quote.maxDays
+          ? {
+              delivery_estimate: {
+                minimum: { unit: 'business_day', value: quote.minDays },
+                maximum: { unit: 'business_day', value: quote.maxDays },
+              },
+            }
+          : {}),
+      },
+    }));
 
     // Prepare checkout session data
     const sessionData: any = {
       payment_method_types: ['card'],
       billing_address_collection: 'required',
       shipping_address_collection: {
-        allowed_countries: ['US', 'CA', 'GB'],
+        allowed_countries: ['US'],
       },
+      shipping_options: shippingOptions,
       line_items: lineItems,
       mode: 'payment',
       success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,

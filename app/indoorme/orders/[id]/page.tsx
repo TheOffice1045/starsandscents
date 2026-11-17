@@ -21,6 +21,16 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Order {
   id: string;
@@ -30,6 +40,8 @@ interface Order {
   billing_address: any;
   fulfillment_status: string;
   payment_status: string;
+  payment_intent_id?: string | null;
+  refunded_amount?: number | null;
   items: any[];
   subtotal: number;
   total: number;
@@ -49,6 +61,10 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
   const [printLoading, setPrintLoading] = useState(false);
   const [storeInfo, setStoreInfo] = useState<any>(null);
   const invoiceRef = useRef<HTMLDivElement>(null);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundRestock, setRefundRestock] = useState(false);
+  const [refunding, setRefunding] = useState(false);
   const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   
   // Function to handle payment status update
@@ -75,6 +91,59 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
     }
   };
   
+  // Refunds go through the server: it talks to Stripe and records the result.
+  const refundable = order && ['paid', 'partially_refunded'].includes(order.payment_status);
+  const refundedSoFar = Number(order?.refunded_amount ?? 0);
+  const refundRemaining = order ? Math.max(Number(order.total) - refundedSoFar, 0) : 0;
+
+  const openRefundDialog = () => {
+    if (!order) return;
+    setRefundAmount(refundRemaining.toFixed(2));
+    setRefundRestock(order.fulfillment_status !== 'fulfilled');
+    setRefundOpen(true);
+  };
+
+  const handleRefund = async () => {
+    if (!order) return;
+    const amount = Number(refundAmount);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > refundRemaining + 0.001) {
+      toast.error(`Enter an amount between $0.01 and $${refundRemaining.toFixed(2)}`);
+      return;
+    }
+
+    setRefunding(true);
+    try {
+      const response = await fetch(`/api/admin/orders/${id}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, restock: refundRestock }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Refund failed');
+
+      setOrder({
+        ...order,
+        payment_status: result.paymentStatus,
+        refunded_amount: result.refundedAmount,
+      });
+      setRefundOpen(false);
+
+      toast.success(
+        result.manual
+          ? 'Refund recorded. Send the money back to the customer yourself.'
+          : 'Refund issued through Stripe'
+      );
+      if (result.restockFailures > 0) {
+        toast.warning(`${result.restockFailures} item(s) could not be restocked; adjust stock manually.`);
+      }
+    } catch (error: any) {
+      console.error('Error refunding order:', error);
+      toast.error(error.message || 'Refund failed');
+    } finally {
+      setRefunding(false);
+    }
+  };
+
   useEffect(() => {
     const fetchStoreInfo = async () => {
       try {
@@ -508,7 +577,13 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-xl font-bold">{order.order_number || `Order #${id.slice(0, 8)}`}</h1>
                 <Badge variant={order.payment_status === 'paid' ? 'success' : 'warning'} className="ml-2">
-                  {order.payment_status === 'paid' ? 'Paid' : 'Pending Payment'}
+                  {order.payment_status === 'paid'
+                    ? 'Paid'
+                    : order.payment_status === 'refunded'
+                      ? 'Refunded'
+                      : order.payment_status === 'partially_refunded'
+                        ? 'Partially Refunded'
+                        : 'Pending Payment'}
                 </Badge>
                 <Badge variant={order.fulfillment_status === 'fulfilled' ? 'success' : 'warning'}>
                   {order.fulfillment_status === 'fulfilled' ? 'Fulfilled' : 'Unfulfilled'}
@@ -536,7 +611,7 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
             </div>
             
             <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
-              {order.payment_status !== 'paid' && (
+              {!['paid', 'refunded', 'partially_refunded'].includes(order.payment_status) && (
                 <AdminButton size="sm" variant="outline" onClick={handleConfirmPayment}>
                   <CheckCircle className="mr-2 h-4 w-4" />
                   Confirm Payment
@@ -571,7 +646,7 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
                     Edit Order
                   </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem>
+                  <DropdownMenuItem disabled={!refundable} onSelect={openRefundDialog}>
                     <DollarSign className="mr-2 h-4 w-4" />
                     Refund
                   </DropdownMenuItem>
@@ -833,6 +908,64 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
           </Card>
         </div>
       </div>
+
+      <Dialog open={refundOpen} onOpenChange={(open) => !refunding && setRefundOpen(open)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Refund {order.order_number || `order #${id.slice(0, 8)}`}</DialogTitle>
+            <DialogDescription>
+              {order.payment_intent_id
+                ? "The amount is returned to the customer's card through Stripe."
+                : 'No Stripe payment is on file (e.g. Venmo or Zelle). This only records the refund; you must send the money back yourself.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="refund-amount">
+                Amount (up to ${refundRemaining.toFixed(2)}
+                {refundedSoFar > 0 ? `, $${refundedSoFar.toFixed(2)} already refunded` : ''})
+              </Label>
+              <Input
+                id="refund-amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                max={refundRemaining}
+                value={refundAmount}
+                onChange={(e) => setRefundAmount(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="refund-restock"
+                checked={refundRestock}
+                onCheckedChange={(checked) => setRefundRestock(checked as boolean)}
+              />
+              <label htmlFor="refund-restock" className="text-sm text-gray-600">
+                Return items to stock (applies when refunding the full amount)
+              </label>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <AdminButton variant="outline" onClick={() => setRefundOpen(false)} disabled={refunding}>
+              Cancel
+            </AdminButton>
+            <AdminButton variant="destructive" onClick={handleRefund} disabled={refunding}>
+              {refunding ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Refunding...
+                </>
+              ) : (
+                'Issue refund'
+              )}
+            </AdminButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

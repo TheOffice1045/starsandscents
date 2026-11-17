@@ -5,8 +5,16 @@ import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AuthDivider,
+  AuthLayout,
+  AuthMessage,
+  authButtonClass,
+  authFieldClass,
+  authLabelClass,
+} from '@/components/auth/AuthLayout';
 
 export default function SignIn() {
   const [email, setEmail] = useState('');
@@ -37,61 +45,59 @@ export default function SignIn() {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-50">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl text-center">Sign In</CardTitle>
-          <CardDescription className="text-center">
-            Enter your credentials to access your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="email">
-                Email
-              </label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium" htmlFor="password">
-                  Password
-                </label>
-                <Link href="/reset-password" className="text-xs text-blue-600 hover:underline">
-                  Forgot password?
-                </Link>
-              </div>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <p className="text-sm text-gray-600">
-            Don&apos;t have an account?{' '}
-            <Link href="/signup" className="text-blue-600 hover:underline">
-              Sign up
+    <AuthLayout
+      eyebrow="Welcome back"
+      title="Sign in"
+      description="Sign in to see your orders, wishlist and account details."
+    >
+      <form onSubmit={handleSubmit} className="mt-10 space-y-6">
+        <div className="space-y-2">
+          <label className={authLabelClass} htmlFor="email">
+            Email
+          </label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="name@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={authFieldClass}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className={authLabelClass} htmlFor="password">
+              Password
+            </label>
+            <Link
+              href="/reset-password"
+              className="text-xs text-[#6B5A55] underline-offset-4 hover:text-[#4A332F] hover:underline"
+            >
+              Forgot password?
             </Link>
-          </p>
-        </CardFooter>
-      </Card>
-    </div>
+          </div>
+          <PasswordInput
+            id="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={authFieldClass}
+            required
+          />
+        </div>
+        {error && <AuthMessage type="error">{error}</AuthMessage>}
+        <Button type="submit" className={authButtonClass} disabled={isLoading}>
+          {isLoading ? 'Signing in…' : 'Sign in'}
+        </Button>
+      </form>
+
+      <AuthDivider>New here?</AuthDivider>
+
+      <Button asChild variant="secondary" className={authButtonClass}>
+        <Link href="/signup">Create an account</Link>
+      </Button>
+    </AuthLayout>
   );
 }

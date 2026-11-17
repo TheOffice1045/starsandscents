@@ -1,25 +1,17 @@
 import { NextResponse } from 'next/server';
-import { NextRequest } from 'next/server';
-import { isAuthenticated } from '@/lib/auth';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/admin-auth';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const session = await isAuthenticated(req);
-    
-    if (!session) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.response;
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
+    const supabase = createClient();
     const { data: settings, error } = await supabase
       .from('store_settings')
       .select('reviews_enabled, star_ratings_enabled, star_ratings_required')
-      .eq('store_id', session.id)
+      .eq('store_id', auth.admin.storeId)
       .single();
 
     if (error) {
@@ -34,31 +26,24 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const session = await isAuthenticated(req);
-    
-    if (!session) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const auth = await requireAdmin();
+    if (!auth.ok) return auth.response;
 
     const body = await req.json();
     const { reviewsEnabled, starRatingsEnabled, starRatingsRequired } = body;
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
+    const supabase = createClient();
     const { error } = await supabase
       .from('store_settings')
-      .upsert({
-        store_id: session.id,
+      .update({
         reviews_enabled: reviewsEnabled,
         star_ratings_enabled: starRatingsEnabled,
         star_ratings_required: starRatingsRequired,
         updated_at: new Date().toISOString()
-      });
+      })
+      .eq('store_id', auth.admin.storeId);
 
     if (error) {
       console.error("Error updating review settings:", error);

@@ -2,10 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
+import {
+  AuthLayout,
+  AuthMessage,
+  authButtonClass,
+  authFieldClass,
+  authLabelClass,
+} from '@/components/auth/AuthLayout';
 
 export default function UpdatePassword() {
   const [password, setPassword] = useState('');
@@ -57,53 +63,43 @@ export default function UpdatePassword() {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-50">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl text-center">Update Password</CardTitle>
-          <CardDescription className="text-center">
-            Create a new password for your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="password">
-                New Password
-              </label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="confirmPassword">
-                Confirm New Password
-              </label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
-            </div>
-            {message && (
-              <div className={`p-3 rounded-md ${
-                message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-              }`}>
-                {message.text}
-              </div>
-            )}
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Updating...' : 'Update Password'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+    <AuthLayout
+      eyebrow="Almost done"
+      title="Choose a new password"
+      description="Pick a password you'll remember. You'll use it to sign in from now on."
+    >
+      <form onSubmit={handleSubmit} className="mt-10 space-y-6">
+        <div className="space-y-2">
+          <label className={authLabelClass} htmlFor="password">
+            New password
+          </label>
+          <PasswordInput
+            id="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={authFieldClass}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <label className={authLabelClass} htmlFor="confirmPassword">
+            Confirm new password
+          </label>
+          <PasswordInput
+            id="confirmPassword"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className={authFieldClass}
+            required
+          />
+        </div>
+        {message && <AuthMessage type={message.type}>{message.text}</AuthMessage>}
+        <Button type="submit" className={authButtonClass} disabled={isLoading}>
+          {isLoading ? 'Updating…' : 'Update password'}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

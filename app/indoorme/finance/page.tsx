@@ -1,6 +1,7 @@
 "use client";
 
 import { AdminButton } from "@/components/ui/admin-button";
+import { netRevenue } from '@/lib/revenue';
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search, Download, TrendingUp, DollarSign, CreditCard, ArrowUpRight, ArrowDownRight, Loader2, Check, MoreVertical, Eye, FileText, Calendar, User, ShoppingCart, Copy, Receipt, X } from "lucide-react";
@@ -128,12 +129,12 @@ export default function FinancePage() {
         if (previousOrdersError) throw previousOrdersError;
         
         // Calculate current period stats
-        const currentTotalRevenue = currentOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+        const currentTotalRevenue = currentOrders.reduce((sum, order) => sum + netRevenue(order), 0);
         const currentTransactionCount = currentOrders.length;
         const currentAOV = currentTransactionCount > 0 ? currentTotalRevenue / currentTransactionCount : 0;
         
         // Calculate previous period stats
-        const previousTotalRevenue = previousOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+        const previousTotalRevenue = previousOrders.reduce((sum, order) => sum + netRevenue(order), 0);
         const previousTransactionCount = previousOrders.length;
         const previousAOV = previousTransactionCount > 0 ? previousTotalRevenue / previousTransactionCount : 0;
         
@@ -148,16 +149,32 @@ export default function FinancePage() {
         const aovChange = calculatePercentChange(currentAOV, previousAOV);
         
         // Format transactions for display
-        const formattedTransactions = currentOrders.map(order => ({
-          id: `TRX-${order.id.substring(0, 6)}`,
-          created_at: order.created_at,
-          type: 'Sale',
-          amount: order.total || 0,
-          status: order.payment_status || 'Completed',
-          customer_name: order.customer_name || 'Guest',
-          order_id: order.id,
-          order_number: order.order_number || `#${order.id.substring(0, 4)}`
-        }));
+        const formattedTransactions = currentOrders.flatMap(order => {
+          const base = {
+            created_at: order.created_at,
+            status: order.payment_status || 'Completed',
+            customer_name: order.customer_name || 'Guest',
+            order_id: order.id,
+            order_number: order.order_number || `#${order.id.substring(0, 4)}`
+          };
+          const rows = [{
+            ...base,
+            id: `TRX-${order.id.substring(0, 6)}`,
+            type: 'Sale',
+            amount: order.total || 0,
+          }];
+          // Refunds appear as their own negative row (the table already styles 'Refund')
+          if (order.refunded_amount > 0) {
+            rows.push({
+              ...base,
+              id: `REF-${order.id.substring(0, 6)}`,
+              type: 'Refund',
+              amount: -order.refunded_amount,
+              created_at: order.updated_at || order.created_at,
+            });
+          }
+          return rows;
+        });
         
         // Update state with calculated data
         setStats({

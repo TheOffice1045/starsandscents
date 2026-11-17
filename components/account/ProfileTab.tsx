@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -295,8 +296,7 @@ export default function ProfileTab({ user, profile }: { user: any, profile: any 
           <form onSubmit={handleUpdatePassword} className="space-y-4">
             <div>
               <label className="text-sm font-medium">Current Password</label>
-              <Input 
-                type="password" 
+              <PasswordInput 
                 value={currentPassword} 
                 onChange={(e) => setCurrentPassword(e.target.value)} 
                 placeholder="Current password"
@@ -305,8 +305,7 @@ export default function ProfileTab({ user, profile }: { user: any, profile: any 
             
             <div>
               <label className="text-sm font-medium">New Password</label>
-              <Input 
-                type="password" 
+              <PasswordInput 
                 value={newPassword} 
                 onChange={(e) => setNewPassword(e.target.value)} 
                 placeholder="New password"
@@ -315,8 +314,7 @@ export default function ProfileTab({ user, profile }: { user: any, profile: any 
             
             <div>
               <label className="text-sm font-medium">Confirm New Password</label>
-              <Input 
-                type="password" 
+              <PasswordInput 
                 value={confirmPassword} 
                 onChange={(e) => setConfirmPassword(e.target.value)} 
                 placeholder="Confirm new password"

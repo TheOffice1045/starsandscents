@@ -195,10 +195,13 @@ export default function OrdersTab({ user }: { user: any }) {
     }
   };
 
-  // Function to check if order is within cancellation window (2 hours)
-  const isOrderCancellable = (orderDate: string) => {
+  // Cancellable within 2 hours, and only before it ships or is refunded
+  // (the database enforces the same rules).
+  const isOrderCancellable = (order: { created_at: string; fulfillment_status?: string; payment_status?: string }) => {
+    if (order.fulfillment_status && order.fulfillment_status !== 'unfulfilled') return false;
+    if (order.payment_status === 'refunded' || order.payment_status === 'partially_refunded') return false;
     try {
-      const orderTime = new Date(orderDate).getTime();
+      const orderTime = new Date(order.created_at).getTime();
       const currentTime = new Date().getTime();
       const twoHoursInMs = 2 * 60 * 60 * 1000;
       return currentTime - orderTime <= twoHoursInMs;
@@ -400,7 +403,7 @@ export default function OrdersTab({ user }: { user: any }) {
                     <DropdownMenuItem onClick={() => handleTrack(order)}>
                       <Truck className="mr-2 h-4 w-4" /> Track Shipment
                     </DropdownMenuItem>
-                    {order.status !== 'cancelled' && isOrderCancellable(order.created_at) && (
+                    {order.status !== 'cancelled' && isOrderCancellable(order) && (
                       <>
                         <Separator />
                         <DropdownMenuItem onClick={() => handleCancelOrder(order.id)} className="text-red-600 focus:text-red-500 focus:bg-red-50">
@@ -478,7 +481,7 @@ export default function OrdersTab({ user }: { user: any }) {
                 <div className="bg-gray-50 rounded-lg max-h-[400px] overflow-y-auto">
                   <div className="divide-y">
                     {selectedOrder.order_items?.map((item: any) => {
-                      const isItemCancellable = selectedOrder.status !== 'cancelled' && isOrderCancellable(selectedOrder.created_at) && (item.status === undefined || item.status === null || item.status === 'active');
+                      const isItemCancellable = selectedOrder.status !== 'cancelled' && isOrderCancellable(selectedOrder) && (item.status === undefined || item.status === null || item.status === 'active');
                       return (
                         <div key={item.id} className={`flex gap-4 items-center p-4 ${item.status === 'cancelled' ? 'opacity-60' : ''}`}>
                           <div className="relative h-16 w-16 min-w-[4rem]">

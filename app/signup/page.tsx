@@ -5,8 +5,16 @@ import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AuthDivider,
+  AuthLayout,
+  AuthMessage,
+  authButtonClass,
+  authFieldClass,
+  authLabelClass,
+} from '@/components/auth/AuthLayout';
 
 export default function SignUp() {
   const [email, setEmail] = useState('');
@@ -48,74 +56,70 @@ export default function SignUp() {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-50">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl text-center">Create an Account</CardTitle>
-          <CardDescription className="text-center">
-            Enter your details to create a new account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {successMessage ? (
-            <div className="p-4 bg-green-50 text-green-700 rounded-md">
-              {successMessage}
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="email">
-                  Email
-                </label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="password">
-                  Password
-                </label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="confirmPassword">
-                  Confirm Password
-                </label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Creating account...' : 'Sign Up'}
-              </Button>
-            </form>
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <p className="text-sm text-gray-600">
-            Already have an account?{' '}
-            <Link href="/signin" className="text-blue-600 hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </CardFooter>
-      </Card>
-    </div>
+    <AuthLayout
+      eyebrow="Join us"
+      title="Create an account"
+      description="It only takes a minute. You'll get an email to confirm your address."
+    >
+      {successMessage ? (
+        <div className="mt-10">
+          <AuthMessage type="success">{successMessage}</AuthMessage>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="mt-10 space-y-6">
+          <div className="space-y-2">
+            <label className={authLabelClass} htmlFor="email">
+              Email
+            </label>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="name@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={authFieldClass}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <label className={authLabelClass} htmlFor="password">
+              Password
+            </label>
+            <PasswordInput
+              id="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={authFieldClass}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <label className={authLabelClass} htmlFor="confirmPassword">
+              Confirm password
+            </label>
+            <PasswordInput
+              id="confirmPassword"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className={authFieldClass}
+              required
+            />
+          </div>
+          {error && <AuthMessage type="error">{error}</AuthMessage>}
+          <Button type="submit" className={authButtonClass} disabled={isLoading}>
+            {isLoading ? 'Creating account…' : 'Create account'}
+          </Button>
+        </form>
+      )}
+
+      <AuthDivider>Already have an account?</AuthDivider>
+
+      <Button asChild variant="secondary" className={authButtonClass}>
+        <Link href="/signin">Sign in</Link>
+      </Button>
+    </AuthLayout>
   );
 }

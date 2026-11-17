@@ -26,9 +26,10 @@ import {
 import { FormLabel } from "@/components/ui/form";
 import Image from "next/image";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DiscountDialog } from "../components/discount-dialog";
 
 interface SelectedProduct {
-  id: number;
+  id: any; // products.id (uuid)
   name: string;
   sku: string;
   price: number;
@@ -67,6 +68,9 @@ export default function CreateOrderPage() {
     phone?: string;
   }>>([]);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
+  const [discountRule, setDiscountRule] = useState<{ amount: number; type: 'fixed' | 'percentage' } | null>(null);
+  const [shippingInput, setShippingInput] = useState("");
+  const [isEditingShipping, setIsEditingShipping] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedView, setSelectedView] = useState<"main" | "all-products">("main");
   const [notes, setNotes] = useState("");
@@ -218,10 +222,16 @@ export default function CreateOrderPage() {
   };
 
   const subtotal = selectedProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
-  const discount = 0; // TODO: Implement discount functionality
-  const shipping = 0; // TODO: Implement shipping functionality
+  // Discount never exceeds the subtotal; tax applies after the discount.
+  const discount = !discountRule
+    ? 0
+    : Math.min(
+        subtotal,
+        discountRule.type === 'percentage' ? subtotal * (Math.min(discountRule.amount, 100) / 100) : discountRule.amount
+      );
+  const shipping = Math.max(0, Number(shippingInput) || 0);
   const taxRate = 0.08; // 8% tax rate - you might want to make this configurable
-  const tax = subtotal * taxRate;
+  const tax = (subtotal - discount) * taxRate;
   const total = subtotal + shipping - discount + tax;
 
   const handleCreateOrder = async () => {
@@ -265,6 +275,7 @@ export default function CreateOrderPage() {
         fulfillment_status: "unfulfilled",
         notes: notes,
         subtotal: subtotal,
+        discount: discount,
         shipping: shipping,
         tax: tax,
         total: total,
@@ -300,6 +311,7 @@ export default function CreateOrderPage() {
       // Create order items
       const orderItems = selectedProducts.map(product => ({
         order_id: order.id,
+        product_id: product.id,
         product_name: product.name,
         quantity: product.quantity,
         price: product.price,
@@ -316,8 +328,31 @@ export default function CreateOrderPage() {
         console.error('Order items creation error:', itemsError);
         throw itemsError;
       }
+
+      // Take the items out of stock, like Stripe checkout does, so refunds and
+      // deletes can put them back.
+      for (const product of selectedProducts) {
+        const { error: stockError } = await supabase.rpc('update_product_stock', {
+          p_product_id: product.id,
+          p_quantity: product.quantity,
+        });
+        if (stockError) {
+          console.error('Stock update failed for', product.name, stockError);
+          toast.warning(`Couldn't update stock for ${product.name}; adjust it manually.`);
+        }
+      }
       
       toast.success("Order created successfully");
+
+      // Best-effort: tell the other admins. Never blocks or fails order creation.
+      fetch('/api/admin/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'New Order',
+          message: `${orderData.customer_name} - order ${orderNumber} created manually for $${Number(total).toFixed(2)}.`,
+        }),
+      }).catch((err) => console.error('Failed to send order notification:', err));
       
       // Clear form state before navigation to prevent stale state
       setSelectedProducts([]);
@@ -393,7 +428,7 @@ export default function CreateOrderPage() {
                       key={product.id}
                       className="p-4 hover:bg-gray-50 cursor-pointer flex items-center justify-between"
                       onClick={() => {
-                        // TODO: Add product to order
+                        handleAddProducts([product]);
                         setSearchQuery("");
                       }}
                     >
@@ -490,17 +525,47 @@ export default function CreateOrderPage() {
                     <span>${subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <Button 
-                      variant="link" 
-                      className="text-blue-600 h-auto p-0"
-                      onClick={() => setIsDiscountModalOpen(true)}
-                    >
-                      Add discount
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="link" 
+                        className="text-blue-600 h-auto p-0"
+                        onClick={() => setIsDiscountModalOpen(true)}
+                      >
+                        {discountRule ? 'Edit discount' : 'Add discount'}
+                      </Button>
+                      {discountRule && (
+                        <>
+                          <span className="text-xs text-gray-500">
+                            {discountRule.type === 'percentage' ? `${discountRule.amount}%` : `$${discountRule.amount.toFixed(2)}`}
+                          </span>
+                          <Button variant="link" className="text-xs text-red-600 h-auto p-0" onClick={() => setDiscountRule(null)}>
+                            Remove
+                          </Button>
+                        </>
+                      )}
+                    </div>
                     <span>-${discount.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <Button variant="link" className="text-blue-600 h-auto p-0">Add shipping</Button>
+                  <div className="flex justify-between items-center">
+                    {isEditingShipping ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600">Shipping $</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="h-8 w-28"
+                          value={shippingInput}
+                          onChange={(e) => setShippingInput(e.target.value)}
+                          onBlur={() => setIsEditingShipping(false)}
+                          autoFocus
+                        />
+                      </div>
+                    ) : (
+                      <Button variant="link" className="text-blue-600 h-auto p-0" onClick={() => setIsEditingShipping(true)}>
+                        {shipping > 0 ? 'Edit shipping' : 'Add shipping'}
+                      </Button>
+                    )}
                     <span>${shipping.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
@@ -761,6 +826,12 @@ export default function CreateOrderPage() {
               </div>
             </DialogContent>
           </Dialog>
+
+      <DiscountDialog
+        open={isDiscountModalOpen}
+        onOpenChange={setIsDiscountModalOpen}
+        onApplyDiscount={(amount, type) => setDiscountRule({ amount, type })}
+      />
     </div>
   );
 }

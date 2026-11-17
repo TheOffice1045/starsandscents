@@ -189,6 +189,17 @@ export const createPasswordResetEmail = (
   `
 });
 
+// Carrier display names and tracking-page URLs, keyed by the ids the admin
+// fulfilment form uses (a plain carrier name like "UPS" matches too).
+const CARRIERS: Record<string, { name: string; trackingUrl: (n: string) => string }> = {
+  usps: { name: 'USPS', trackingUrl: (n) => `https://tools.usps.com/go/TrackConfirmAction_input?qtc_tLabels1=${n}` },
+  ups: { name: 'UPS', trackingUrl: (n) => `https://www.ups.com/track?tracknum=${n}` },
+  fedex: { name: 'FedEx', trackingUrl: (n) => `https://www.fedex.com/fedextrack/?trknbr=${n}` },
+  dhl: { name: 'DHL', trackingUrl: (n) => `https://www.dhl.com/us-en/home/tracking.html?tracking-id=${n}` },
+};
+
+const resolveCarrier = (carrier: string) => CARRIERS[carrier.trim().toLowerCase()];
+
 // Shipping confirmation email template
 export const createShippingConfirmationEmail = (
   customerEmail: string,
@@ -197,7 +208,20 @@ export const createShippingConfirmationEmail = (
   trackingNumber: string,
   carrier: string = 'USPS',
   storeName: string = DEFAULT_STORE_NAME
-): EmailTemplate => ({
+): EmailTemplate => {
+  // Several parcels arrive as comma-joined values; link to the first one.
+  const firstTracking = trackingNumber.split(',')[0].trim();
+  const knownCarrier = resolveCarrier(carrier.split(',')[0]);
+  const carrierLabel = carrier
+    .split(',')
+    .map((c) => resolveCarrier(c)?.name ?? c.trim())
+    .filter((c, i, all) => all.indexOf(c) === i)
+    .join(', ');
+  const trackingUrl = knownCarrier
+    ? knownCarrier.trackingUrl(encodeURIComponent(firstTracking))
+    : null;
+
+  return {
   to: [customerEmail],
   subject: `Your order #${orderNumber} has shipped - ${storeName}`,
   html: `
@@ -228,14 +252,14 @@ export const createShippingConfirmationEmail = (
         <div class="shipping-info">
           <h3>Shipping Details</h3>
           <p><strong>Order Number:</strong> #${orderNumber}</p>
-          <p><strong>Carrier:</strong> ${carrier}</p>
+          <p><strong>Carrier:</strong> ${carrierLabel}</p>
           <p><strong>Tracking Number:</strong> ${trackingNumber}</p>
           
-          <div style="text-align: center;">
-            <a href="https://tools.usps.com/go/TrackConfirmAction_input?qtc_tLabels1=${trackingNumber}" class="tracking-button">
+          ${trackingUrl ? `<div style="text-align: center;">
+            <a href="${trackingUrl}" class="tracking-button">
               Track Your Package
             </a>
-          </div>
+          </div>` : ''}
         </div>
         
         <p>Your package should arrive within 3-7 business days. You'll receive updates as your package moves through our shipping network.</p>
@@ -248,7 +272,8 @@ export const createShippingConfirmationEmail = (
     </body>
     </html>
   `
-});
+  };
+};
 
 // Contact form email template
 export const createContactFormEmail = (
