@@ -3,7 +3,7 @@
 import { Inter as GeistSans } from 'next/font/google';
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, ShoppingCart, Package, Users, DollarSign, Settings, ChevronDown, ChevronRight, Home, FolderOpen, BoxesIcon, ClipboardCheck, ClipboardList, PackageCheck, Store, TicketPercent, Wallet, Bell, Inbox, History, ShoppingBag } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Package, Users, DollarSign, Settings, ChevronDown, ChevronRight, Home, FolderOpen, BoxesIcon, ClipboardCheck, ClipboardList, PackageCheck, Store, TicketPercent, Wallet, Bell, Inbox, History, ShoppingBag, PanelsTopLeft, Gift } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { useState, useEffect } from "react";
 import { createBrowserClient } from "@supabase/ssr";
@@ -45,6 +45,7 @@ const sidebarItems: SidebarItem[] = [
     subItems: [
       { label: "Inventory", href: "/indoorme/products/inventory", icon: PackageCheck },
       { label: "Collections", href: "/indoorme/products/collections", icon: FolderOpen },
+      { label: "Bundles", href: "/indoorme/products/bundles", icon: Gift },
       
     ]
   },
@@ -54,6 +55,7 @@ const sidebarItems: SidebarItem[] = [
   { label: "Notifications", href: "/indoorme/notifications", icon: Bell },
   { label: "Messages", href: "/indoorme/messages", icon: Inbox },
   { label: "Activity", href: "/indoorme/activity", icon: History },
+  { label: "Site Content", href: "/indoorme/content", icon: PanelsTopLeft, ownerAdminOnly: true },
   { label: "My Store", href: "/", icon: Store, target: "_blank", rel: "noopener noreferrer" },
 ];
 

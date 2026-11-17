@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { normalizeShippingConfig, validateShippingConfig } from '@/lib/shipping';
+import { getSiteContent } from '@/lib/site-content-server';
+import { paragraphs } from '@/lib/site-content';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,12 +53,18 @@ async function getShippingMethods() {
 }
 
 export default async function ShippingPage() {
-  const methods = await getShippingMethods();
+  const [methods, { 'shipping.page': c }] = await Promise.all([
+    getShippingMethods(),
+    getSiteContent(['shipping.page']),
+  ]);
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-4xl font-bold mb-8">Shipping Information</h1>
+      <h1 className="text-4xl font-bold mb-8">{c.title}</h1>
       <div className="prose max-w-none">
+        {paragraphs(c.intro).map((p, i) => (
+          <p key={i} className="mb-4">{p}</p>
+        ))}
         <section className="mb-8">
           <h2 className="text-2xl font-semibold mb-4">Shipping Methods</h2>
           {methods.length > 0 ? (
@@ -75,22 +83,25 @@ export default async function ShippingPage() {
           )}
         </section>
 
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">Shipping Policy</h2>
-          <ul className="space-y-4">
-            <li>Orders are processed within 1-2 business days</li>
-            <li>Shipping is available within the continental United States</li>
-            <li>Tracking information will be provided via email</li>
-            <li>Signature may be required for orders over $100</li>
-          </ul>
-        </section>
+        {c.policyItems.length > 0 && (
+          <section className="mb-8">
+            {c.policyHeading && <h2 className="text-2xl font-semibold mb-4">{c.policyHeading}</h2>}
+            <ul className="space-y-4">
+              {c.policyItems.map((item: string, i: number) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+          </section>
+        )}
 
-        <section>
-          <h2 className="text-2xl font-semibold mb-4">International Shipping</h2>
-          <p className="mb-4">
-            Currently, we only ship within the continental United States. We plan to expand our shipping options to international destinations in the future.
-          </p>
-        </section>
+        {c.internationalText && (
+          <section>
+            {c.internationalHeading && <h2 className="text-2xl font-semibold mb-4">{c.internationalHeading}</h2>}
+            {paragraphs(c.internationalText).map((p, i) => (
+              <p key={i} className="mb-4">{p}</p>
+            ))}
+          </section>
+        )}
       </div>
     </div>
   );

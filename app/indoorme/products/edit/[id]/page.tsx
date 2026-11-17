@@ -31,6 +31,7 @@ import { ArrowLeft, Loader2, Plus, Trash2, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { formatPrice, validateProduct } from "@/lib/utils";
 import Image from 'next/image';
+import { BundleEditor } from "@/components/admin/BundleEditor";
 
 interface ProductImage {
   id: string;
@@ -70,6 +71,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
   const [uploadingImage, setUploadingImage] = useState(false);
   const [newTag, setNewTag] = useState("");
   const [chargeTax, setChargeTax] = useState(false);
+  const [isBundle, setIsBundle] = useState(false);
   const [collections, setCollections] = useState<{id: string, name: string}[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -737,6 +739,16 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
             )}
           </div>
 
+          {/* Bundle contents */}
+          <BundleEditor
+            productId={product.id}
+            bundlePrice={Number(product.price) || 0}
+            onBundleChange={(bundle, available) => {
+              setIsBundle(bundle);
+              if (available !== null) setProduct((prev) => (prev ? { ...prev, quantity: available } : prev));
+            }}
+          />
+
           {/* SEO */}
           <div className="bg-white rounded-lg border p-6">
             <h2 className="text-base font-medium mb-4">Search Engine Optimization</h2>
@@ -850,7 +862,13 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                   value={product.quantity}
                   onChange={handleNumericChange}
                   placeholder="Quantity in stock"
+                  disabled={isBundle}
                 />
+                {isBundle && (
+                  <p className="text-xs text-gray-500">
+                    This is a bundle: its stock is worked out from the candles inside it.
+                  </p>
+                )}
               </div>
               
               <div className="grid grid-cols-2 gap-4">

@@ -151,10 +151,22 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           
         if (imageError) throw imageError;
         
+        // Bundle contents (none for a normal product, or before the bundles migration)
+        let bundleItems: { quantity: number; product: { id: string; title: string; price: number } }[] = [];
+        const { data: bundleRows } = await supabase
+          .from('product_bundle_items')
+          .select('quantity, position, product:products!product_bundle_items_product_id_fkey (id, title, price)')
+          .eq('bundle_id', productId)
+          .order('position', { ascending: true });
+        if (bundleRows) {
+          bundleItems = (bundleRows as any[]).filter((row) => row.product);
+        }
+
         // Combine product with images
         setProduct({
           ...productData,
-          images: imageData || []
+          images: imageData || [],
+          bundleItems
         });
       } catch (error) {
         console.error('Error fetching product:', error);
@@ -269,6 +281,34 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           <div className="prose max-w-none">
             <p>{product.description}</p>
           </div>
+
+          {product.bundleItems?.length > 0 && (() => {
+            const separate = product.bundleItems.reduce(
+              (sum: number, item: any) => sum + (Number(item.product.price) || 0) * item.quantity,
+              0
+            );
+            const saving = separate - Number(product.price);
+            return (
+              <div className="rounded-lg border p-4">
+                <h2 className="font-medium mb-3">What&apos;s inside</h2>
+                <ul className="space-y-2 text-sm">
+                  {product.bundleItems.map((item: any) => (
+                    <li key={item.product.id} className="flex justify-between gap-4">
+                      <a href={`/products/${item.product.id}`} className="hover:underline">
+                        {item.quantity > 1 ? `${item.quantity} × ` : ''}{item.product.title}
+                      </a>
+                      <span className="text-gray-500">${(Number(item.product.price) * item.quantity).toFixed(2)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {saving > 0.004 && (
+                  <p className="mt-3 pt-3 border-t text-sm font-medium text-[#4A332F]">
+                    Save ${saving.toFixed(2)} compared with buying separately
+                  </p>
+                )}
+              </div>
+            );
+          })()}
           
           <div className="pt-6 border-t border-gray-200">
             <div className="flex items-center gap-4 mb-6">
