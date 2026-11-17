@@ -93,7 +93,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    // Managers run day-to-day operations; settings, roles and finance are Owner/Admin only.
+    // Managers run day-to-day operations; settings, roles, finance and site content are Owner/Admin only.
     const isOwnerOrAdmin = roleNames.some(name => name === 'Owner' || name === 'Admin');
     if (!isOwnerOrAdmin && OWNER_ADMIN_PATHS.some(prefix => pathname.startsWith(prefix))) {
       const redirectUrl = new URL('/indoorme', request.url);
@@ -117,7 +117,7 @@ export async function middleware(request: NextRequest) {
 }
 
 const ADMIN_ROLES = ['Owner', 'Admin', 'Manager'];
-const OWNER_ADMIN_PATHS = ['/indoorme/settings', '/indoorme/finance'];
+const OWNER_ADMIN_PATHS = ['/indoorme/settings', '/indoorme/finance', '/indoorme/content'];
 const MFA_PATH = '/indoorme/mfa';
 
 // Paths that stay reachable while the site is in "coming-soon" mode
